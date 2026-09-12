@@ -1,0 +1,11 @@
+{
+  "model_name": "LogisticRegression",
+  "model_version": "product_v1",
+  "threshold": 0.41662803044772917,
+  "roc_auc": 0.638071,
+  "precision": 0.506,
+  "recall": 0.785,
+  "f1": 0.615,
+  "training_rows": 50000,
+  "feature_count": 11
+}

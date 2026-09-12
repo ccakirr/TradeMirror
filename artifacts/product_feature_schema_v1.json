@@ -1,0 +1,31 @@
+{
+  "features": [
+    "starting_capital",
+    "account_age_months",
+    "instrument",
+    "risk_per_trade_pct",
+    "trades_per_month",
+    "uses_stop_loss",
+    "avg_win_hold_days",
+    "avg_loss_hold_days",
+    "diversification",
+    "follows_plan",
+    "position_sizing_discipline"
+  ],
+  "categorical_features": [
+    "instrument"
+  ],
+  "numeric_features": [
+    "starting_capital",
+    "account_age_months",
+    "risk_per_trade_pct",
+    "trades_per_month",
+    "uses_stop_loss",
+    "avg_win_hold_days",
+    "avg_loss_hold_days",
+    "diversification",
+    "follows_plan",
+    "position_sizing_discipline"
+  ],
+  "threshold": 0.41662803044772917
+}
