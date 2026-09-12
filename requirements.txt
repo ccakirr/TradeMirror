@@ -1,2 +1,5 @@
 fastapi
 joblib
+uvicorn
+pandas
+pydantic
