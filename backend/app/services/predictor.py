@@ -1,10 +1,11 @@
 import joblib
 import pandas as pd
 
-from ..core.config import MODEL_PATH
+from ..core.config import settings
 from ..schemas.predictor import PredictorRequest, PredictorResponse
 
 
+MODEL_PATH = settings.model_path
 RISK_THRESHOLD = 0.4166
 HIGH_RISK_THRESHOLD = 0.70
 MODEL_LOAD_ERROR = None

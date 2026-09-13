@@ -1,10 +1,17 @@
 from pathlib import Path
 
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
-MODEL_PATH = (
-    PROJECT_ROOT
-    / "artifacts"
-    / "product_blowup_risk_logistic_v1.joblib"
-)
+class Settings(BaseSettings):
+    database_url: str
+    model_path: Path
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
+
+
+settings = Settings()

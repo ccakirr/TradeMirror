@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: trademirror-postgres
+    environment:
+      POSTGRES_USER: trademirror
+      POSTGRES_PASSWORD: trademirror_dev
+      POSTGRES_DB: trademirror
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
