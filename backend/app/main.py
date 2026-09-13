@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from .api.predictor import router as predictor_router
+from .api.auth import router as auth_router
 
 app = FastAPI(
     title="TradeMiror API",
@@ -8,6 +9,11 @@ app = FastAPI(
 
 app.include_router(
     predictor_router,
+    prefix="/api/v1"
+)
+
+app.include_router(
+    router=auth_router,
     prefix="/api/v1"
 )
 
