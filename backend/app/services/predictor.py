@@ -1,7 +1,8 @@
 import joblib
 import pandas as pd
+
 from ..core.config import MODEL_PATH
-from ..schemas.predictor import PredictorResponse, PredictorRequest
+from ..schemas.predictor import PredictorRequest, PredictorResponse
 
 
 RISK_THRESHOLD = 0.4166
@@ -12,8 +13,18 @@ try:
     model = joblib.load(MODEL_PATH)
 except Exception as e:
     MODEL_LOAD_ERROR = {
-            "error": f"Unexpected error while loading model. {e}"
-        }
+        "error": f"Unexpected error while loading model. {e}"
+    }
+
+
+def classify_risk(risk_score: float) -> str:
+    if risk_score >= HIGH_RISK_THRESHOLD:
+        return "high"
+
+    if risk_score >= RISK_THRESHOLD:
+        return "medium"
+
+    return "low"
 
 
 def predict(input_data: PredictorRequest) -> PredictorResponse:
@@ -23,28 +34,14 @@ def predict(input_data: PredictorRequest) -> PredictorResponse:
     input_df = pd.DataFrame([
         input_data.model_dump()
     ])
+
     probabilities = model.predict_proba(input_df)
-
     risk_score = float(probabilities[0, 1])
+    risk_class = classify_risk(risk_score)
 
-    if risk_score >= HIGH_RISK_THRESHOLD:
-        return PredictorResponse(
-            score=risk_score,
-            risk_class="high",
-            threshold=RISK_THRESHOLD,
-            model_version="product_v1"
-        )
-    elif risk_score >= RISK_THRESHOLD:
-        return PredictorResponse(
-            score=risk_score,
-            risk_class="medium",
-            threshold=RISK_THRESHOLD,
-            model_version="product_v1"
-        )
-    else:
-        return PredictorResponse(
-            score=risk_score,
-            risk_class="low",
-            threshold=RISK_THRESHOLD,
-            model_version="product_v1"
-        )
+    return PredictorResponse(
+        score=risk_score,
+        risk_class=risk_class,
+        threshold=RISK_THRESHOLD,
+        model_version="product_v1"
+    )
