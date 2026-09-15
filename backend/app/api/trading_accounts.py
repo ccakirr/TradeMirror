@@ -9,7 +9,7 @@ from ..schemas.account import TradingAccountCreate, TradingAccountResponse
 
 
 router = APIRouter(
-    prefix="accounts",
+    prefix="/accounts",
     tags=["trading_accounts"]
 )
 
