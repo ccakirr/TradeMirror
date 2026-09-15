@@ -62,3 +62,8 @@ class TradingAccount(Base):
         nullable=False,
         server_default=func.now()
     )
+
+    trades = relationship(
+        "Trade",
+        back_populates="trading_account"
+    )
