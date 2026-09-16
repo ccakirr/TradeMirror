@@ -34,6 +34,8 @@ export default function AccountDetail({
   onSaveRiskProfile,
   riskAssessmentsByTrade = {},
   onLoadRiskAssessments,
+  riskReportsByTrade = {},
+  onLoadRiskReport,
 }) {
   const [form, setForm] = useState(emptyTrade);
   const [errors, setErrors] = useState({});
@@ -95,6 +97,7 @@ export default function AccountDetail({
   );
 
   const selectedAssessments = selectedTrade ? riskAssessmentsByTrade[selectedTrade.id] || [] : [];
+  const selectedReport = selectedTrade ? riskReportsByTrade[selectedTrade.id] || null : null;
 
   const selectedInstrument = useMemo(
     () => (selectedTrade ? instruments.find((item) => item.symbol === selectedTrade.instrument) || null : null),
@@ -365,6 +368,8 @@ export default function AccountDetail({
             onCloseTrade={onCloseTrade}
             assessments={selectedAssessments}
             onLoadAssessments={onLoadRiskAssessments}
+            report={selectedReport}
+            onLoadReport={onLoadRiskReport}
             onDismiss={() => setSelectedTradeId(null)}
           />
         ) : (

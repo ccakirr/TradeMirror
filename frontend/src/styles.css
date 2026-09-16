@@ -227,6 +227,78 @@ h3 {
 .risk-medium { color: #d2b86b; }
 .risk-high { color: var(--negative); }
 
+.risk-report {
+  display: grid;
+  gap: 14px;
+  padding-top: 10px;
+}
+
+.risk-report-verdict {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.risk-report-verdict b {
+  font: 700 13px/1 var(--font-mono);
+  letter-spacing: 1px;
+}
+
+.risk-report-verdict small {
+  color: var(--text-faint);
+  font: 10px var(--font-mono);
+  text-align: right;
+}
+
+.risk-report .trade-details {
+  padding: 0;
+}
+
+.risk-findings {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.risk-findings li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 10px;
+}
+
+/* The dot carries the severity; the sentence stays plain so it reads as prose. */
+.risk-findings li span {
+  width: 6px;
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+
+.risk-findings li p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.finding-good span { background: var(--positive); }
+.finding-warn span { background: #d2b86b; }
+.finding-bad span { background: var(--negative); }
+.finding-bad p { color: var(--text); }
+
+.risk-report-note {
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1.6;
+}
 
 @media (max-width: 760px) {
   .risk-profile-fields { grid-template-columns: 1fr; }
@@ -1768,30 +1840,6 @@ main:focus {
 }
 
 /* The slots the screenshot upload and risk report will drop into. */
-.panel-soon {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-top: 16px;
-  border-top: 1px dashed var(--border);
-}
-
-.panel-soon span {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  color: var(--text-faint);
-  font-size: 12px;
-}
-
-.panel-soon i {
-  color: var(--accent);
-  font: 10px var(--font-mono);
-  font-style: normal;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-}
-
 .panel-scrim {
   display: none;
   position: fixed;

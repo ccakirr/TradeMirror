@@ -24,6 +24,8 @@ from ..services.risk_assessment import (
     create_risk_assessment,
     list_risk_assessments,
 )
+from ..services.risk_report import get_risk_report
+from ..schemas.risk_report import RiskReportResponse
 from ..schemas.account import (
     TradingAccountCreate,
     TradingAccountResponse,
@@ -214,6 +216,27 @@ def get_trade_risk_assessments(
 ) -> list[RiskAssessmentResponse]:
     try:
         return list_risk_assessments(
+            db=db,
+            current_user=current_user,
+            account_id=account_id,
+            trade_id=trade_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get(
+    "/{account_id}/trades/{trade_id}/risk-report",
+    response_model=RiskReportResponse,
+)
+def get_trade_risk_report(
+    account_id: UUID,
+    trade_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> RiskReportResponse:
+    try:
+        return get_risk_report(
             db=db,
             current_user=current_user,
             account_id=account_id,

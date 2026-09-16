@@ -10,6 +10,7 @@ import {
   tradeReturnPercent,
 } from "../lib/trades";
 import { quantize, stepDecimals } from "../lib/instruments";
+import { findingText, VERDICT_KEYS as RISK_VERDICT_KEYS } from "../lib/riskReport";
 import { Badge, Button, Spinner } from "./ui";
 
 const VERDICT_KEYS = { target: "exitTarget", stop: "exitStop", manual: "exitManual" };
@@ -25,11 +26,24 @@ function Row({ label, value, tone }) {
 
 /**
  * The trade lifecycle in one panel: what was planned, what was executed, how it
- * ended — and where screenshots and the risk report will live.
+ * ended — and the risk report that reads those three against each other.
  */
-export default function TradeDetail({ t, lang, trade, instrument, onLoad, onCloseTrade, assessments = [], onLoadAssessments, onDismiss }) {
+export default function TradeDetail({
+  t,
+  lang,
+  trade,
+  instrument,
+  onLoad,
+  onCloseTrade,
+  assessments = [],
+  onLoadAssessments,
+  report = null,
+  onLoadReport,
+  onDismiss,
+}) {
   const [refreshing, setRefreshing] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [reportFailed, setReportFailed] = useState(false);
   const [closing, setClosing] = useState(false);
   const [exitPrice, setExitPrice] = useState("");
   const [closeError, setCloseError] = useState("");
@@ -38,14 +52,16 @@ export default function TradeDetail({ t, lang, trade, instrument, onLoad, onClos
   const panelRef = useRef(null);
   const loadRef = useRef(onLoad);
   const loadAssessmentsRef = useRef(onLoadAssessments);
+  const loadReportRef = useRef(onLoadReport);
 
   useEffect(() => {
     loadRef.current = onLoad;
     loadAssessmentsRef.current = onLoadAssessments;
+    loadReportRef.current = onLoadReport;
   });
 
   // The list already holds a copy, so the panel paints instantly and then
-  // reconciles with the server — the same read the screenshot endpoint will use.
+  // reconciles with the server.
   useEffect(() => {
     let cancelled = false;
     setLoadFailed(false);
@@ -68,6 +84,21 @@ export default function TradeDetail({ t, lang, trade, instrument, onLoad, onClos
   useEffect(() => {
     loadAssessmentsRef.current?.(trade.id).catch(() => {});
   }, [trade.id]);
+
+  // The report is derived on demand, so every open asks for a fresh one — a
+  // trade closed a second ago must not be judged on its entry alone.
+  useEffect(() => {
+    let cancelled = false;
+    setReportFailed(false);
+
+    loadReportRef.current?.(trade.id).catch(() => {
+      if (!cancelled) setReportFailed(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [trade.id, trade.is_closed]);
 
   // A different trade is a different panel: never carry a half-typed exit over.
   useEffect(() => {
@@ -221,19 +252,54 @@ export default function TradeDetail({ t, lang, trade, instrument, onLoad, onClos
       )}
 
       <section className="trade-detail-block">
-        <p className="eyebrow">{t("riskAssessment")}</p>
-        {assessments.length ? (
-          <div className="risk-assessment-list">
-            {assessments.map((assessment) => (
-              <div className="risk-assessment" key={assessment.id}>
-                <span>{assessment.stage === "entry" ? t("entryRisk") : t("exitRisk")}</span>
-                <b className={`risk-${assessment.risk_class}`}>{assessment.risk_class.toUpperCase()}</b>
-                <small>{Number(assessment.score).toFixed(3)}</small>
+        <p className="eyebrow">{t("riskReport")}</p>
+        {report ? (
+          <div className="risk-report">
+            <div className="risk-report-verdict">
+              <b className={`risk-${report.risk_class}`}>{t(RISK_VERDICT_KEYS[report.risk_class])}</b>
+              <small>
+                {report.score == null
+                  ? t("modelNoScore")
+                  : `${t("modelScore")} ${decimal(report.score, lang, 3)}`}
+              </small>
+            </div>
+
+            {/* The plan block above already shows the risk in currency; here it
+                only matters next to the account it was taken on. */}
+            <dl className="trade-details">
+              <Row
+                label={t("riskOfBalance")}
+                value={report.risk_pct == null ? null : `${decimal(report.risk_pct, lang)}%`}
+              />
+              <Row label={t("planLimit")} value={`${decimal(report.risk_limit_pct, lang)}%`} />
+              <Row label={t("exposure")} value={`${decimal(report.exposure_pct, lang)}%`} />
+            </dl>
+
+            <ul className="risk-findings">
+              {report.findings.map((finding) => (
+                <li key={finding.code} className={`finding-${finding.level}`}>
+                  <span aria-hidden="true" />
+                  <p>{findingText(t, lang, finding)}</p>
+                </li>
+              ))}
+            </ul>
+
+            {assessments.length > 0 && (
+              <div className="risk-assessment-list">
+                {assessments.map((assessment) => (
+                  <div className="risk-assessment" key={assessment.id}>
+                    <span>{assessment.stage === "entry" ? t("entryRisk") : t("exitRisk")}</span>
+                    <b className={`risk-${assessment.risk_class}`}>{assessment.risk_class.toUpperCase()}</b>
+                    <small>{decimal(assessment.score, lang, 3)}</small>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+
+            <p className="risk-report-note">{t("riskReportNote")}</p>
           </div>
         ) : (
-          <p className="panel-note">{t("noRiskAssessment")}</p>
+          <p className="panel-note">{reportFailed ? t("riskReportFailed") : t("loading")}</p>
         )}
       </section>
 
@@ -295,16 +361,6 @@ export default function TradeDetail({ t, lang, trade, instrument, onLoad, onClos
             {t("closePosition")}
           </Button>
         ))}
-
-      <footer className="panel-soon">
-        <p className="eyebrow">{t("upcoming")}</p>
-        <span>
-          {t("screenshotSlot")} <i>{t("soon")}</i>
-        </span>
-        <span>
-          {t("riskReportSlot")} <i>{t("soon")}</i>
-        </span>
-      </footer>
     </aside>
   );
 }

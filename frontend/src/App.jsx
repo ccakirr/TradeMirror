@@ -28,6 +28,7 @@ export default function App() {
   const [tradesByAccount, setTradesByAccount] = useState({});
   const [riskProfiles, setRiskProfiles] = useState({});
   const [riskAssessmentsByTrade, setRiskAssessmentsByTrade] = useState({});
+  const [riskReportsByTrade, setRiskReportsByTrade] = useState({});
   const [instruments, setInstruments] = useState([]);
   const [booting, setBooting] = useState(Boolean(readToken()));
   const [loadingData, setLoadingData] = useState(false);
@@ -60,6 +61,7 @@ export default function App() {
     setTradesByAccount({});
     setRiskProfiles({});
     setRiskAssessmentsByTrade({});
+    setRiskReportsByTrade({});
     setSelectedId(null);
     setView("dashboard");
   }, []);
@@ -214,6 +216,10 @@ export default function App() {
         token,
       ).catch(() => []);
       setRiskAssessmentsByTrade((current) => ({ ...current, [closed.id]: assessments }));
+      setRiskReportsByTrade((current) => {
+        const { [closed.id]: stale, ...rest } = current;
+        return rest;
+      });
       toast(t("closed"));
       return closed;
     } catch (error) {
@@ -244,6 +250,18 @@ export default function App() {
     );
     setRiskAssessmentsByTrade((current) => ({ ...current, [tradeId]: assessments }));
     return assessments;
+  };
+
+  // The report is derived server-side from the trade, the account and the risk
+  // profile, so it is fetched rather than stored — always current by definition.
+  const loadRiskReport = async (accountId, tradeId) => {
+    const report = await api(
+      `/api/v1/accounts/${accountId}/trades/${tradeId}/risk-report`,
+      {},
+      token,
+    );
+    setRiskReportsByTrade((current) => ({ ...current, [tradeId]: report }));
+    return report;
   };
 
   // The panel renders from the cached row first, then swaps in the server's copy.
@@ -409,6 +427,7 @@ export default function App() {
               trades={tradesByAccount[selected.id]}
               riskProfile={riskProfiles[selected.id]}
               riskAssessmentsByTrade={riskAssessmentsByTrade}
+              riskReportsByTrade={riskReportsByTrade}
               loading={loadingData && !tradesByAccount[selected.id]}
               back={() => go("accounts")}
               instruments={instruments}
@@ -417,6 +436,7 @@ export default function App() {
               onLoadTrade={loadTrade}
               onSaveRiskProfile={saveRiskProfile}
               onLoadRiskAssessments={(tradeId) => loadRiskAssessments(selected.id, tradeId)}
+              onLoadRiskReport={(tradeId) => loadRiskReport(selected.id, tradeId)}
             />
           )}
           {view === "profile" && (
