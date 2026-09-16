@@ -1,36 +1,438 @@
-import { useEffect, useMemo, useState } from "react";
-import "./language.css";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { api, ApiError, clearToken, readToken, writeToken } from "./lib/api";
+import { translate } from "./lib/i18n";
+import { useLanguage, useTheme } from "./lib/preferences";
+import { Button, useToast } from "./components/ui";
+import { ConnectionStatus, LanguageSelect, ThemeToggle } from "./components/Controls";
+import Auth from "./components/Auth";
+import Dashboard from "./components/Dashboard";
+import Accounts from "./components/Accounts";
+import AccountDetail from "./components/AccountDetail";
+import Profile from "./components/Profile";
 
-const copy = {
-  en: { workspace:"PRIVATE WORKSPACE", overview:"Overview", accounts:"Accounts", profile:"Profile", logout:"Sign out", connected:"API connected", disconnected:"API disconnected", access:"ACCESS", welcome:"Welcome back", createWorkspace:"Create your workspace", signIn:"Sign in", register:"Register", enter:"Enter workspace", create:"Create workspace", tagline:"A JOURNAL FOR BETTER DECISIONS", headline:"See the trade", headline2:"behind the trade.", intro:"Track every account, every position and the behavior that connects them.", dashboard:"Good to see you.", yourAccounts:"Your accounts", accountStructure:"PORTFOLIO STRUCTURE", everyAccount:"Every account has a story.", structureText:"Keep separate brokers, strategies and journals in their own spaces.", newAccount:"NEW ACCOUNT", createSpace:"Create a space", addText:"Add a broker or exchange account. You can create as many as you need.", name:"Account name", balance:"Initial balance", current:"Current balance", active:"ACTIVE", personal:"personal account", open:"Open account", noAccounts:"No trading accounts yet", firstAccount:"Create first account", tracked:"TRACKED BALANCE", logged:"TRADES LOGGED", coming:"Coming with journal", risk:"RISK STATUS", needs:"Needs trade history", overviewTag:"ACCOUNT OVERVIEW", recent:"Recent activity", journal:"TRADE JOURNAL", reports:"Risk reports", soon:"soon", journalStart:"Your journal starts here", journalText:"Trades, screenshots and reflections will live inside each account. The trade endpoint is the next piece of the product.", insight:"BEHAVIORAL INSIGHT", riskPicture:"Your risk picture will build here.", riskText:"Once trades are logged, TradeMiror will evaluate decisions at entry and after the position closes.", engine:"Risk engine", history:"Journal history", ready:"READY", empty:"EMPTY", email:"EMAIL", member:"Member since", authenticated:"You are signed in.", created:"Account created successfully." },
-  tr: { workspace:"ÖZEL ÇALIŞMA ALANI", overview:"Genel Bakış", accounts:"Hesaplar", profile:"Profil", logout:"Çıkış yap", connected:"API bağlı", disconnected:"API bağlantısı yok", access:"ERİŞİM", welcome:"Tekrar hoş geldin", createWorkspace:"Çalışma alanını oluştur", signIn:"Giriş yap", register:"Kayıt ol", enter:"Çalışma alanına gir", create:"Çalışma alanı oluştur", tagline:"DAHA İYİ KARARLAR İÇİN GÜNLÜK", headline:"İşlemin", headline2:"arkasındaki hikâyeyi gör.", intro:"Her hesabı, her pozisyonu ve onları birbirine bağlayan davranışları takip et.", dashboard:"Seni görmek güzel.", yourAccounts:"Hesapların", accountStructure:"PORTFÖY YAPISI", everyAccount:"Her hesabın bir hikâyesi var.", structureText:"Broker, strateji ve günlüklerini ayrı alanlarda tut.", newAccount:"YENİ HESAP", createSpace:"Bir alan oluştur", addText:"Bir borsa veya broker hesabı ekle. İhtiyacın kadar hesap oluşturabilirsin.", name:"Hesap adı", balance:"Başlangıç bakiyesi", current:"Mevcut bakiye", active:"AKTİF", personal:"kişisel hesap", open:"Hesabı aç", noAccounts:"Henüz trading hesabın yok", firstAccount:"İlk hesabı oluştur", tracked:"TAKİP EDİLEN BAKİYE", logged:"KAYITLI İŞLEM", coming:"Günlükle birlikte gelecek", risk:"RİSK DURUMU", needs:"Geçmiş verisi gerekli", overviewTag:"HESAP ÖZETİ", recent:"Son aktiviteler", journal:"TRADE GÜNLÜĞÜ", reports:"Risk raporları", soon:"yakında", journalStart:"Günlüğün burada başlıyor", journalText:"İşlemler, ekran görüntüleri ve notların her hesabın içinde yaşayacak. Trade endpoint’i ürünün sıradaki parçası.", insight:"DAVRANIŞSAL İÇGÖRÜ", riskPicture:"Risk görünümün burada oluşacak.", riskText:"İşlemler kaydedildiğinde TradeMiror, pozisyon açılışında ve kapanışından sonra kararlarını değerlendirecek.", engine:"Risk motoru", history:"Günlük geçmişi", ready:"HAZIR", empty:"BOŞ", email:"E-POSTA", member:"Üyelik tarihi", authenticated:"Giriş yapıldı.", created:"Hesap başarıyla oluşturuldu." },
+const VIEWS = {
+  dashboard: { icon: "◈", key: "overview" },
+  accounts: { icon: "▣", key: "accounts" },
+  profile: { icon: "◎", key: "profile" },
 };
-const api = async (path, options = {}, token) => { const headers = { "Content-Type":"application/json", ...(options.headers || {}) }; if (token) headers.Authorization = `Bearer ${token}`; const response = await fetch(path, { ...options, headers }); const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.detail || `Request failed (${response.status})`); return data; };
-const money = (value) => new Intl.NumberFormat("en-US", { style:"currency", currency:"USD" }).format(Number(value || 0));
-const Field = ({ label, children }) => <label className="field"><span>{label}</span>{children}</label>;
 
 export default function App() {
-  const [lang, setLang] = useState(() => localStorage.getItem("trademirror_language") || "en");
-  const t = copy[lang];
-  const [token, setToken] = useState(() => localStorage.getItem("trademirror_token")); const [user, setUser] = useState(null); const [accounts, setAccounts] = useState([]); const [view, setView] = useState("dashboard"); const [selected, setSelected] = useState(null); const [mode, setMode] = useState("login"); const [auth, setAuth] = useState({ email:"", password:"" }); const [message, setMessage] = useState(""); const [form, setForm] = useState({ name:"", initial_balance:"" }); const [apiOnline, setApiOnline] = useState(false);
-  useEffect(() => { api("/health").then(() => setApiOnline(true)).catch(() => setApiOnline(false)); if (token) api("/api/v1/auth/me", {}, token).then((u) => { setUser(u); setAccounts(JSON.parse(localStorage.getItem(`trademirror_accounts_${u.id}`) || "[]")); }).catch(() => { localStorage.removeItem("trademirror_token"); setToken(null); }); }, [token]);
-  const changeLanguage = (value) => { localStorage.setItem("trademirror_language", value); setLang(value); };
-  const submitAuth = async (event) => { event.preventDefault(); setMessage(""); try { if (mode === "register") await api("/api/v1/auth/register", { method:"POST", body:JSON.stringify(auth) }); const login = await api("/api/v1/auth/login", { method:"POST", body:JSON.stringify(auth) }); localStorage.setItem("trademirror_token", login.access_token); setToken(login.access_token); } catch (error) { setMessage(error.message); } };
-  const createAccount = async (event) => { event.preventDefault(); setMessage(""); try { const created = await api("/api/v1/accounts/", { method:"POST", body:JSON.stringify({ name:form.name, initial_balance:Number(form.initial_balance) }) }, token); const next = [...accounts, created]; setAccounts(next); localStorage.setItem(`trademirror_accounts_${user.id}`, JSON.stringify(next)); setSelected(created); setForm({ name:"", initial_balance:"" }); setMessage(t.created); setView("accounts"); } catch (error) { setMessage(error.message); } };
-  const logout = () => { localStorage.removeItem("trademirror_token"); setToken(null); setUser(null); setAccounts([]); };
-  const total = useMemo(() => accounts.reduce((sum, item) => sum + Number(item.current_balance || 0), 0), [accounts]);
-  if (!user) return <Auth t={t} lang={lang} changeLanguage={changeLanguage} mode={mode} setMode={setMode} auth={auth} setAuth={setAuth} message={message} submit={submitAuth} online={apiOnline} />;
-  const open = (account) => { setSelected(account); setView("detail"); };
-  return <div className="app-shell"><aside className="sidebar"><a className="brand" href="#" onClick={() => setView("dashboard")}><span className="mark">T</span><span>Trade<span>Miror</span></span></a><p className="side-label">{t.workspace}</p><nav><Nav active={view === "dashboard"} onClick={() => setView("dashboard")} icon="◈">{t.overview}</Nav><Nav active={view === "accounts" || view === "detail"} onClick={() => setView("accounts")} icon="▣">{t.accounts}<small>{accounts.length}</small></Nav><Nav disabled icon="↗">{t.journal}<small>{t.soon}</small></Nav></nav><div className="sidebar-bottom"><Nav active={view === "profile"} onClick={() => setView("profile")} icon="◎">{t.profile}</Nav><Nav onClick={logout} icon="↪">{t.logout}</Nav></div></aside><div className="content"><header className="topbar"><div><p className="eyebrow">{t.workspace}</p><h1>{view === "dashboard" ? t.dashboard : view === "accounts" ? t.yourAccounts : view === "detail" ? selected?.name : t.profile}</h1></div><div className="header-right"><select className="language" value={lang} onChange={(e) => changeLanguage(e.target.value)}><option value="en">English</option><option value="tr">Türkçe</option></select><span className={`status ${apiOnline ? "online" : ""}`}><i />{apiOnline ? t.connected : t.disconnected}</span><div className="avatar">{user.email[0].toUpperCase()}</div></div></header>{view === "dashboard" && <Dashboard t={t} user={user} accounts={accounts} total={total} go={setView} open={open} />}{view === "accounts" && <Accounts t={t} accounts={accounts} open={open} form={form} setForm={setForm} submit={createAccount} message={message} />}{view === "detail" && selected && <Detail t={t} account={selected} back={() => setView("accounts")} />}{view === "profile" && <Profile t={t} user={user} />}</div></div>;
-}
+  const [lang, setLang] = useLanguage();
+  const [theme, setTheme] = useTheme();
+  const t = useCallback((key, vars) => translate(lang, key, vars), [lang]);
+  const toast = useToast();
 
-function Nav({ active, disabled, onClick, icon, children }) { return <button className={`nav-item ${active ? "active" : ""} ${disabled ? "disabled" : ""}`} disabled={disabled} onClick={onClick}><span>{icon}</span>{children}</button>; }
-function Auth({ t, lang, changeLanguage, mode, setMode, auth, setAuth, message, submit, online }) { return <div className="auth-page"><div className="auth-top"><a className="auth-brand"><span className="mark">T</span><span>Trade<span>Miror</span></span></a><select className="language" value={lang} onChange={(e) => changeLanguage(e.target.value)}><option value="en">English</option><option value="tr">Türkçe</option></select></div><div className="auth-layout"><div className="auth-copy"><p className="eyebrow">{t.tagline}</p><h1>{t.headline}<br /><em>{t.headline2}</em></h1><p>{t.intro}</p><div className="principles"><span>01 / reflect</span><span>02 / understand</span><span>03 / improve</span></div></div><section className="auth-card"><p className="eyebrow">{t.access}</p><h2>{mode === "login" ? t.welcome : t.createWorkspace}</h2><div className="tabs"><button className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>{t.signIn}</button><button className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>{t.register}</button></div><form onSubmit={submit}><Field label={t.email}><input type="email" value={auth.email} onChange={(e) => setAuth({ ...auth, email:e.target.value })} required /></Field><Field label="Password"><input type="password" value={auth.password} onChange={(e) => setAuth({ ...auth, password:e.target.value })} minLength="8" required /></Field><button className="button primary">{mode === "login" ? t.enter : t.create}<b>→</b></button></form><p className="message">{message}</p><p className="auth-note"><i className={online ? "on" : ""} /> {online ? t.connected : t.disconnected}</p></section></div></div>; }
-function Dashboard({ t, user, accounts, total, go, open }) { return <main><section className="welcome"><div><p className="eyebrow">{t.workspace}</p><h2>{t.dashboard}</h2><p>Welcome, {user.email.split("@")[0]}.</p></div><button className="button primary" onClick={() => go("accounts")}>{t.createAccount} <b>＋</b></button></section><section className="stats"><div><span>{t.accounts.toUpperCase()}</span><strong>{accounts.length}</strong></div><div><span>{t.tracked}</span><strong>{money(total)}</strong></div><div><span>{t.logged}</span><strong>—</strong><small>{t.coming}</small></div><div><span>{t.risk}</span><strong className="neutral">—</strong><small>{t.needs}</small></div></section><section className="section-head"><div><p className="eyebrow">{t.yourAccounts}</p><h2>{t.chooseSpace}</h2></div><button className="text-button" onClick={() => go("accounts")}>{t.viewAll} <b>→</b></button></section>{accounts.length ? <div className="account-grid">{accounts.slice(0,3).map((a) => <Card key={a.id} account={a} t={t} onClick={() => open(a)} />)}</div> : <Empty t={t} onClick={() => go("accounts")} />}</main>; }
-function Accounts({ t, accounts, open, form, setForm, submit, message }) { return <main><section className="section-head accounts-head"><div><p className="eyebrow">{t.accountStructure}</p><h2>{t.everyAccount}</h2><p className="muted">{t.structureText}</p></div></section><div className="accounts-layout"><div className="account-grid">{accounts.map((a) => <Card key={a.id} account={a} t={t} onClick={() => open(a)} />)}{!accounts.length && <Empty t={t} />}</div><section className="card create-card"><p className="eyebrow">{t.newAccount}</p><h2>{t.createSpace}</h2><p className="muted">{t.addText}</p><form onSubmit={submit}><Field label={t.name}><input value={form.name} onChange={(e) => setForm({ ...form, name:e.target.value })} minLength="3" maxLength="64" required /></Field><Field label={t.balance}><input type="number" value={form.initial_balance} onChange={(e) => setForm({ ...form, initial_balance:e.target.value })} min="0.01" step="0.01" required /></Field><button className="button primary">{t.createAccount} <b>→</b></button></form><p className="message success">{message}</p></section></div></main>; }
-function Card({ account, t, onClick }) { return <button className="account-card" onClick={onClick}><div className="account-card-top"><span className="account-symbol">↗</span><span className="active-dot">{t.active}</span></div><h3>{account.name}</h3><span className="account-number">{String(account.id).slice(0,8)} · {t.personal}</span><div className="account-balance"><span>{t.current}</span><strong>{money(account.current_balance)}</strong></div><div className="account-card-foot"><span>0 trades</span><b>{t.open} →</b></div></button>; }
-function Empty({ t, onClick }) { return <div className="empty-wide"><div className="empty-icon">＋</div><h3>{t.noAccounts}</h3><p>{t.structureText}</p>{onClick && <button className="button secondary" onClick={onClick}>{t.firstAccount} <b>→</b></button>}</div>; }
-function Detail({ t, account, back }) { return <main><button className="back" onClick={back}>← {t.accounts}</button><section className="detail-hero"><div><p className="eyebrow">{t.overviewTag}</p><h2>{account.name}</h2><p className="muted">{t.personal} · {new Date(account.created_at).toLocaleDateString()}</p></div><div className="detail-balance"><span>{t.current.toUpperCase()}</span><strong>{money(account.current_balance)}</strong><small>{t.balance} {money(account.initial_balance)}</small></div></section><section className="detail-tabs"><span className="selected">{t.overview}</span><span>{t.journal} <small>{t.soon}</small></span><span>{t.reports} <small>{t.soon}</small></span></section><div className="detail-grid"><section className="card"><div className="card-title"><div><p className="eyebrow">{t.journal}</p><h2>{t.recent}</h2></div><span>0 trades</span></div><div className="empty-state"><div className="empty-icon">＋</div><h3>{t.journalStart}</h3><p>{t.journalText}</p><button className="button secondary" disabled>{t.createAccount} <b>→</b></button></div></section><section className="card insight"><p className="eyebrow">{t.insight}</p><h2>{t.riskPicture}</h2><p className="muted">{t.riskText}</p><div className="insight-line"><span>{t.engine}</span><b>{t.ready}</b></div><div className="insight-line"><span>{t.history}</span><b>{t.empty}</b></div></section></div></main>; }
-function Profile({ t, user }) { return <main><section className="section-head"><div><p className="eyebrow">{t.profile.toUpperCase()}</p><h2>{t.intro}</h2></div></section><section className="card profile-card"><div className="profile-avatar">{user.email[0].toUpperCase()}</div><div><p className="eyebrow">{t.email}</p><h3>{user.email}</h3><p className="muted">{t.member} {new Date(user.created_at).toLocaleDateString()}</p></div></section></main>; }
-copy.en.createAccount = "Create account";
-copy.tr.createAccount = "Hesap oluştur";
+  const [token, setToken] = useState(readToken);
+  const [user, setUser] = useState(null);
+  const [accounts, setAccounts] = useState([]);
+  const [tradesByAccount, setTradesByAccount] = useState({});
+  const [riskProfiles, setRiskProfiles] = useState({});
+  const [riskAssessmentsByTrade, setRiskAssessmentsByTrade] = useState({});
+  const [instruments, setInstruments] = useState([]);
+  const [booting, setBooting] = useState(Boolean(readToken()));
+  const [loadingData, setLoadingData] = useState(false);
+  const [online, setOnline] = useState(null);
+  const [view, setView] = useState("dashboard");
+  const [selectedId, setSelectedId] = useState(null);
+
+  const selected = useMemo(
+    () => accounts.find((account) => account.id === selectedId) || null,
+    [accounts, selectedId],
+  );
+
+  const checkHealth = useCallback(async () => {
+    setOnline(null);
+    try {
+      await api("/health");
+      setOnline(true);
+      return true;
+    } catch {
+      setOnline(false);
+      return false;
+    }
+  }, []);
+
+  const signOut = useCallback(() => {
+    clearToken();
+    setToken(null);
+    setUser(null);
+    setAccounts([]);
+    setTradesByAccount({});
+    setRiskProfiles({});
+    setRiskAssessmentsByTrade({});
+    setSelectedId(null);
+    setView("dashboard");
+  }, []);
+
+  useEffect(() => {
+    checkHealth();
+  }, [checkHealth]);
+
+  // One pass on sign-in: identity, accounts, then every account's journal so the
+  // dashboard can show real totals instead of placeholders.
+  useEffect(() => {
+    if (!token) {
+      setBooting(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingData(true);
+
+    (async () => {
+      try {
+        // Reference data rides along with identity; losing it must not end the session.
+        const [profile, catalog] = await Promise.all([
+          api("/api/v1/auth/me", {}, token),
+          api("/api/v1/instruments/").catch(() => []),
+        ]);
+        if (cancelled) return;
+        setUser(profile);
+        setInstruments(catalog);
+
+        const list = await api("/api/v1/accounts/", {}, token);
+        if (cancelled) return;
+        setAccounts(list);
+
+        const profiles = await Promise.all(
+          list.map((account) =>
+            api(`/api/v1/accounts/${account.id}/risk-profile`, {}, token)
+              .then((profile) => [account.id, profile])
+              .catch(() => [account.id, null]),
+          ),
+        );
+        if (cancelled) return;
+        setRiskProfiles(Object.fromEntries(profiles));
+
+        const journals = await Promise.all(
+          list.map((account) =>
+            api(`/api/v1/accounts/${account.id}/trades`, {}, token)
+              .then((trades) => [account.id, trades])
+              .catch(() => [account.id, []]),
+          ),
+        );
+        if (cancelled) return;
+        setTradesByAccount(Object.fromEntries(journals));
+      } catch (error) {
+        if (cancelled) return;
+        // A dead token is the common case; anything else leaves the session alone.
+        if (error instanceof ApiError && error.status === 401) signOut();
+        else if (error instanceof ApiError && error.status === 0) setOnline(false);
+      } finally {
+        if (!cancelled) {
+          setBooting(false);
+          setLoadingData(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, signOut]);
+
+  const friendlyError = useCallback(
+    (error, mode) => {
+      if (!(error instanceof ApiError)) return error;
+      if (error.status === 0) return new Error(t("networkError"));
+      if (mode === "login" && error.status === 401) return new Error(t("invalidCredentials"));
+      if (mode === "register" && (error.status === 400 || error.status === 409)) {
+        return new Error(t("emailTaken"));
+      }
+      return error;
+    },
+    [t],
+  );
+
+  const authenticate = async (mode, credentials) => {
+    try {
+      if (mode === "register") {
+        await api("/api/v1/auth/register", { method: "POST", body: JSON.stringify(credentials) });
+      }
+      const session = await api("/api/v1/auth/login", { method: "POST", body: JSON.stringify(credentials) });
+      writeToken(session.access_token);
+      setBooting(true);
+      setToken(session.access_token);
+      setOnline(true);
+    } catch (error) {
+      throw friendlyError(error, mode);
+    }
+  };
+
+  const createAccount = async (payload) => {
+    try {
+      const created = await api("/api/v1/accounts/", { method: "POST", body: JSON.stringify(payload) }, token);
+      setAccounts((current) => [created, ...current]);
+      setTradesByAccount((current) => ({ ...current, [created.id]: [] }));
+      toast(t("created"));
+      return created;
+    } catch (error) {
+      throw friendlyError(error);
+    }
+  };
+
+  const createTrade = async (payload) => {
+    try {
+      const created = await api(
+        `/api/v1/accounts/${selectedId}/trades`,
+        { method: "POST", body: JSON.stringify(payload) },
+        token,
+      );
+      setTradesByAccount((current) => ({
+        ...current,
+        [selectedId]: [created, ...(current[selectedId] || [])],
+      }));
+      const assessments = await api(
+        `/api/v1/accounts/${selectedId}/trades/${created.id}/risk-assessments`,
+        {},
+        token,
+      ).catch(() => []);
+      setRiskAssessmentsByTrade((current) => ({ ...current, [created.id]: assessments }));
+      toast(t("tradeCreated"));
+      return created;
+    } catch (error) {
+      throw friendlyError(error);
+    }
+  };
+
+  const closeTrade = async (trade, exitPrice) => {
+    try {
+      const closed = await api(
+        `/api/v1/accounts/${selectedId}/trades/${trade.id}/close`,
+        { method: "POST", body: JSON.stringify({ exit_price: exitPrice }) },
+        token,
+      );
+      setTradesByAccount((current) => ({
+        ...current,
+        [selectedId]: (current[selectedId] || []).map((item) => (item.id === closed.id ? closed : item)),
+      }));
+      const refreshedAccounts = await api("/api/v1/accounts/", {}, token);
+      setAccounts(refreshedAccounts);
+      const assessments = await api(
+        `/api/v1/accounts/${selectedId}/trades/${closed.id}/risk-assessments`,
+        {},
+        token,
+      ).catch(() => []);
+      setRiskAssessmentsByTrade((current) => ({ ...current, [closed.id]: assessments }));
+      toast(t("closed"));
+      return closed;
+    } catch (error) {
+      throw friendlyError(error);
+    }
+  };
+
+  const saveRiskProfile = async (accountId, payload) => {
+    try {
+      const profile = await api(
+        `/api/v1/accounts/${accountId}/risk-profile`,
+        { method: "PUT", body: JSON.stringify(payload) },
+        token,
+      );
+      setRiskProfiles((current) => ({ ...current, [accountId]: profile }));
+      toast(t("riskProfileSaved"));
+      return profile;
+    } catch (error) {
+      throw friendlyError(error);
+    }
+  };
+
+  const loadRiskAssessments = async (accountId, tradeId) => {
+    const assessments = await api(
+      `/api/v1/accounts/${accountId}/trades/${tradeId}/risk-assessments`,
+      {},
+      token,
+    );
+    setRiskAssessmentsByTrade((current) => ({ ...current, [tradeId]: assessments }));
+    return assessments;
+  };
+
+  // The panel renders from the cached row first, then swaps in the server's copy.
+  const loadTrade = async (tradeId) => {
+    try {
+      const detail = await api(`/api/v1/accounts/${selectedId}/trades/${tradeId}`, {}, token);
+      setTradesByAccount((current) => ({
+        ...current,
+        [selectedId]: (current[selectedId] || []).map((item) => (item.id === detail.id ? detail : item)),
+      }));
+      return detail;
+    } catch (error) {
+      throw friendlyError(error);
+    }
+  };
+
+  const openAccount = (account) => {
+    setSelectedId(account.id);
+    setView("detail");
+  };
+
+  const go = (next) => {
+    setView(next);
+    if (next !== "detail") setSelectedId(null);
+  };
+
+  if (booting) {
+    return (
+      <div className="boot">
+        <span className="mark" aria-hidden="true">
+          T
+        </span>
+        <p>{t("loading")}</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Auth
+        t={t}
+        lang={lang}
+        setLang={setLang}
+        theme={theme}
+        setTheme={setTheme}
+        online={online}
+        onSubmit={authenticate}
+      />
+    );
+  }
+
+  const title =
+    view === "dashboard"
+      ? t("dashboard")
+      : view === "accounts"
+        ? t("yourAccounts")
+        : view === "detail"
+          ? selected?.name || t("accounts")
+          : t("profile");
+
+  return (
+    <div className="app-shell">
+      <a className="skip-link" href="#main">
+        {t("skipToContent")}
+      </a>
+
+      <aside className="sidebar">
+        <button type="button" className="brand" onClick={() => go("dashboard")}>
+          <span className="mark" aria-hidden="true">
+            T
+          </span>
+          <span>
+            Trade<span>Miror</span>
+          </span>
+        </button>
+
+        <p className="side-label">{t("workspace")}</p>
+
+        <nav aria-label={t("workspace")}>
+          {Object.entries(VIEWS).map(([name, meta]) => {
+            const active = name === view || (name === "accounts" && view === "detail");
+            return (
+              <button
+                key={name}
+                type="button"
+                className={`nav-item ${active ? "active" : ""}`}
+                aria-current={active ? "page" : undefined}
+                onClick={() => go(name)}
+              >
+                <span aria-hidden="true">{meta.icon}</span>
+                <em>{t(meta.key)}</em>
+                {name === "accounts" && accounts.length > 0 && <small>{accounts.length}</small>}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="sidebar-bottom">
+          <button type="button" className="nav-item" onClick={signOut}>
+            <span aria-hidden="true">↪</span>
+            <em>{t("logout")}</em>
+          </button>
+        </div>
+      </aside>
+
+      <div className="content">
+        <header className="topbar">
+          <div>
+            <p className="eyebrow">{t("workspace")}</p>
+            <h1>{title}</h1>
+          </div>
+          <div className="header-right">
+            <ConnectionStatus online={online} t={t} />
+            <ThemeToggle theme={theme} setTheme={setTheme} t={t} />
+            <LanguageSelect lang={lang} setLang={setLang} t={t} />
+            <div className="avatar" title={user.email}>
+              {user.email[0].toUpperCase()}
+            </div>
+          </div>
+        </header>
+
+        {online === false && (
+          <div className="offline-banner" role="alert">
+            <div>
+              <strong>{t("offlineTitle")}</strong>
+              <p>{t("offlineText")}</p>
+            </div>
+            <Button variant="secondary" className="compact" onClick={checkHealth}>
+              {t("retry")}
+            </Button>
+          </div>
+        )}
+
+        <main id="main" tabIndex={-1}>
+          {view === "dashboard" && (
+            <Dashboard
+              t={t}
+              lang={lang}
+              user={user}
+              accounts={accounts}
+              tradesByAccount={tradesByAccount}
+              loading={loadingData}
+              go={go}
+              open={openAccount}
+            />
+          )}
+          {view === "accounts" && (
+            <Accounts
+              t={t}
+              lang={lang}
+              accounts={accounts}
+              tradesByAccount={tradesByAccount}
+              loading={loadingData}
+              open={openAccount}
+              onCreate={createAccount}
+            />
+          )}
+          {view === "detail" && selected && (
+            <AccountDetail
+              t={t}
+              lang={lang}
+              account={selected}
+              trades={tradesByAccount[selected.id]}
+              riskProfile={riskProfiles[selected.id]}
+              riskAssessmentsByTrade={riskAssessmentsByTrade}
+              loading={loadingData && !tradesByAccount[selected.id]}
+              back={() => go("accounts")}
+              instruments={instruments}
+              onCreateTrade={createTrade}
+              onCloseTrade={closeTrade}
+              onLoadTrade={loadTrade}
+              onSaveRiskProfile={saveRiskProfile}
+              onLoadRiskAssessments={(tradeId) => loadRiskAssessments(selected.id, tradeId)}
+            />
+          )}
+          {view === "profile" && (
+            <Profile
+              t={t}
+              lang={lang}
+              setLang={setLang}
+              theme={theme}
+              setTheme={setTheme}
+              user={user}
+              accounts={accounts}
+              onLogout={signOut}
+            />
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
