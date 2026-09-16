@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.staticfiles import StaticFiles
 from .api.predictor import router as predictor_router
 from .api.auth import router as auth_router
 from .api.trading_accounts import router as trading_account_router
@@ -40,3 +43,11 @@ def health_check():
         "status": "ok",
         "service": "trademirror-api"
     }
+
+
+# In Railway production the React build is copied into this same container.
+# API routes above keep their /api prefix, while every other browser request
+# receives the SPA entry point.
+frontend_dir = Path("frontend/dist")
+if frontend_dir.exists():
+    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
