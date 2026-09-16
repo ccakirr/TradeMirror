@@ -42,12 +42,12 @@ class TradingAccount(Base):
     )
 
     initial_balance = Column(
-        Numeric(18, 4),
+        Numeric(28, 10),
         nullable=False
     )
 
     current_balance = Column(
-        Numeric(18, 4),
+        Numeric(28, 10),
         nullable=False
     )
 
@@ -66,4 +66,11 @@ class TradingAccount(Base):
     trades = relationship(
         "Trade",
         back_populates="trading_account"
+    )
+
+    risk_profile = relationship(
+        "TradingAccountRiskProfile",
+        back_populates="account",
+        uselist=False,
+        cascade="all, delete-orphan",
     )

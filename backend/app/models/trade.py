@@ -37,6 +37,12 @@ class Trade(Base):
         back_populates="trades"
     )
 
+    risk_assessments = relationship(
+        "RiskAssessment",
+        back_populates="trade",
+        cascade="all, delete-orphan",
+    )
+
     instrument = Column(
         String,
         nullable=False
@@ -54,25 +60,25 @@ class Trade(Base):
     )
 
     entry_price = Column(
-        Numeric(18, 4),
+        Numeric(28, 10),
         nullable=False
     )
 
     exit_price = Column(
-        Numeric(18, 4),
+        Numeric(28, 10),
     )
 
     position_size = Column(
-        Numeric(18, 4),
+        Numeric(28, 10),
         nullable=False
     )
 
     stop_loss = Column(
-        Numeric(18, 4),
+        Numeric(28, 10),
     )
 
     take_profit = Column(
-        Numeric(18, 4),
+        Numeric(28, 10),
     )
 
     opened_at = Column(
@@ -86,7 +92,7 @@ class Trade(Base):
     )
 
     pnl = Column(
-        Numeric(18, 4),
+        Numeric(28, 10),
     )
 
     notes = Column(
