@@ -78,3 +78,79 @@ export function exitVerdict(trade) {
   if (trade.stop_loss && Math.abs(exit - Number(trade.stop_loss)) <= tolerance) return "stop";
   return "manual";
 }
+
+/**
+ * The balance each trade's risk was actually taken against.
+ *
+ * An account's balance only moves when a position closes, so walking the closed
+ * trades backwards from today's balance recovers what it was worth before each
+ * one settled. Judging a loss against the balance it shrank would flatter it.
+ */
+export function riskLedger(trades = [], currentBalance) {
+  const ledger = new Map();
+  const balance = Number(currentBalance || 0);
+
+  const closed = trades
+    .filter((trade) => trade.is_closed && trade.closed_at)
+    .sort((a, b) => new Date(b.closed_at) - new Date(a.closed_at));
+
+  let running = balance;
+  for (const trade of closed) {
+    running -= Number(trade.pnl || 0);
+    ledger.set(trade.id, running);
+  }
+
+  // Open positions are still being carried by the account as it stands now.
+  for (const trade of trades) {
+    if (!ledger.has(trade.id)) ledger.set(trade.id, balance);
+  }
+
+  return ledger;
+}
+
+/** Planned risk as a share of the balance behind it — null without a stop. */
+export function riskPercent(trade, balance) {
+  const risk = riskAmount(trade);
+  const size = Number(balance || 0);
+  if (risk === null || size <= 0) return null;
+  return (risk / size) * 100;
+}
+
+const average = (values) =>
+  values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+
+/**
+ * The behavior behind the numbers: how often a stop was set, how often the exit
+ * honored the plan, and how the risk taken compares with the plan's limit.
+ * Every metric is null until there is data for it — missing is never zero.
+ */
+export function behaviorSummary(trades = [], { balance, limitPct } = {}) {
+  const ledger = riskLedger(trades, balance);
+  const closed = trades.filter((trade) => trade.is_closed);
+  const withStop = trades.filter((trade) => trade.stop_loss);
+
+  // Only trades that had a plan can be judged against one.
+  const planned = closed.filter((trade) => trade.stop_loss || trade.take_profit);
+  const honored = planned.filter((trade) => ["target", "stop"].includes(exitVerdict(trade)));
+
+  const risks = withStop
+    .map((trade) => riskPercent(trade, ledger.get(trade.id)))
+    .filter((value) => value !== null);
+
+  const limit = Number(limitPct);
+  const breaches = limit > 0 ? risks.filter((value) => value > limit).length : 0;
+
+  return {
+    total: trades.length,
+    closed: closed.length,
+    stopUsage: trades.length ? (withStop.length / trades.length) * 100 : null,
+    missingStops: trades.length - withStop.length,
+    adherence: planned.length ? (honored.length / planned.length) * 100 : null,
+    plannedCount: planned.length,
+    avgRisk: average(risks),
+    riskSample: risks.length,
+    breaches,
+    avgReward: average(trades.map(riskReward).filter((value) => value !== null)),
+    avgR: average(closed.map(rMultiple).filter((value) => value !== null)),
+  };
+}

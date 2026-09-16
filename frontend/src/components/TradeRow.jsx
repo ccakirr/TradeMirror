@@ -1,10 +1,16 @@
-import { percent, price, sign, signedMoney } from "../lib/format";
-import { tradeReturnPercent } from "../lib/trades";
+import { decimal, percent, price, sign, signedMoney } from "../lib/format";
+import { rMultiple, tradeReturnPercent } from "../lib/trades";
 import { Badge } from "./ui";
 
 /** A journal line: summary only. Everything else lives in the detail panel. */
-export default function TradeRow({ trade, t, lang, selected, onSelect }) {
+export default function TradeRow({ trade, t, lang, riskPct = null, limitPct, selected, onSelect }) {
   const returned = tradeReturnPercent(trade);
+  const r = rMultiple(trade);
+
+  // The risk is the part worth seeing while scanning: a run of trades without a
+  // stop, or every one of them over the limit, is the pattern this journal is for.
+  const riskTone =
+    riskPct === null || !limitPct ? "" : riskPct > limitPct * 2 ? "bad" : riskPct > limitPct ? "warn" : "good";
 
   return (
     <li className={`trade ${trade.is_closed ? "is-closed" : "is-open"} ${selected ? "is-selected" : ""}`}>
@@ -22,6 +28,25 @@ export default function TradeRow({ trade, t, lang, selected, onSelect }) {
           <span className="trade-instrument">{trade.instrument}</span>
           <span className="trade-meta">
             {t("entry")} {price(trade.entry_price, lang)} · {price(trade.position_size, lang)}
+          </span>
+          <span className="trade-tags">
+            {trade.stop_loss ? (
+              riskPct !== null && (
+                <b className={`risk-chip ${riskTone}`} title={t("riskOfBalance")}>
+                  {decimal(riskPct, lang)}%
+                </b>
+              )
+            ) : (
+              <b className="risk-chip bad" title={t("previewNoStop")}>
+                {t("noStopChip")}
+              </b>
+            )}
+            {r !== null && (
+              <b className={`risk-chip ${sign(r)}`} title={t("rMultiple")}>
+                {r > 0 ? "+" : ""}
+                {decimal(r, lang)}R
+              </b>
+            )}
           </span>
         </span>
 

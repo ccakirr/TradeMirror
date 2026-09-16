@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { changePercent, decimal, fullDate, money, percent, sign, signedMoney } from "../lib/format";
-import { summarize } from "../lib/trades";
+import { behaviorSummary, riskLedger, riskPercent, summarize } from "../lib/trades";
 import { CATEGORY_KEYS, quantize, stepDecimals } from "../lib/instruments";
 import { Button, EmptyState, Field, Segmented, Skeleton } from "./ui";
 import Combobox from "./Combobox";
@@ -8,6 +8,10 @@ import { Stat, StatGrid } from "./Stats";
 import TradeRow from "./TradeRow";
 import TradeDetail from "./TradeDetail";
 import RiskProfile from "./RiskProfile";
+import RiskPreview from "./RiskPreview";
+import BehaviorPanel from "./BehaviorPanel";
+
+const DEFAULT_RISK_LIMIT_PCT = 2;
 
 const emptyTrade = {
   instrument: "",
@@ -48,6 +52,20 @@ export default function AccountDetail({
   const list = trades || [];
   const summary = useMemo(() => summarize(list), [list]);
   const delta = changePercent(account.initial_balance, account.current_balance);
+
+  // Without a saved profile the page still needs a yardstick; the panels say
+  // when the 2% fallback is the one being used.
+  const limitPct = Number(riskProfile?.risk_per_trade_pct) || DEFAULT_RISK_LIMIT_PCT;
+
+  const behavior = useMemo(
+    () => behaviorSummary(list, { balance: account.current_balance, limitPct }),
+    [list, account.current_balance, limitPct],
+  );
+
+  const ledger = useMemo(
+    () => riskLedger(list, account.current_balance),
+    [list, account.current_balance],
+  );
 
   // With no history the form is the point of the page; once there is a journal, the list is.
   useEffect(() => {
@@ -245,6 +263,8 @@ export default function AccountDetail({
                   trade={trade}
                   t={t}
                   lang={lang}
+                  riskPct={riskPercent(trade, ledger.get(trade.id))}
+                  limitPct={limitPct}
                   selected={trade.id === selectedTradeId}
                   onSelect={(picked) =>
                     setSelectedTradeId((current) => (current === picked.id ? null : picked.id))
@@ -341,6 +361,14 @@ export default function AccountDetail({
                 </Field>
               </div>
 
+              <RiskPreview
+                t={t}
+                lang={lang}
+                draft={form}
+                balance={account.current_balance}
+                limitPct={limitPct}
+              />
+
               <Field label={t("notes")} optional={t("optional")}>
                 <textarea value={form.notes} onChange={update("notes")} rows="3" placeholder={t("notesPlaceholder")} />
               </Field>
@@ -373,23 +401,13 @@ export default function AccountDetail({
             onDismiss={() => setSelectedTradeId(null)}
           />
         ) : (
-          <section className="card insight">
-            <p className="eyebrow">{t("insight")}</p>
-            <h2>{t("riskPicture")}</h2>
-            <p className="muted">{t("riskText")}</p>
-            <div className="insight-line">
-              <span>{t("engine")}</span>
-              <b>{t("ready")}</b>
-            </div>
-            <div className="insight-line">
-              <span>{t("history")}</span>
-              <b>{summary.total || t("empty")}</b>
-            </div>
-            <div className="insight-line">
-              <span>{t("winRate")}</span>
-              <b>{summary.winRate === null ? t("empty") : `${Math.round(summary.winRate)}%`}</b>
-            </div>
-          </section>
+          <BehaviorPanel
+            t={t}
+            lang={lang}
+            behavior={behavior}
+            limitPct={limitPct}
+            hasProfile={Boolean(riskProfile)}
+          />
         )}
       </div>
 

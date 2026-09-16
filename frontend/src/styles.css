@@ -20,6 +20,7 @@
   --accent-soft: rgba(47, 115, 85, 0.1);
   --positive: #1d7a52;
   --negative: #b3453b;
+  --caution: #8a6b15;
   --ring: rgba(47, 115, 85, 0.28);
   --shadow-1: 0 1px 2px rgba(30, 43, 37, 0.04), 0 8px 24px rgba(30, 43, 37, 0.05);
   --shadow-2: 0 12px 32px rgba(30, 43, 37, 0.12);
@@ -50,6 +51,7 @@
     --accent-soft: rgba(159, 197, 169, 0.12);
     --positive: #7fd4a2;
     --negative: #e59089;
+    --caution: #d2b86b;
     --ring: rgba(159, 197, 169, 0.35);
     --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.2), 0 10px 30px rgba(0, 0, 0, 0.18);
     --shadow-2: 0 16px 40px rgba(0, 0, 0, 0.3);
@@ -74,6 +76,7 @@
   --accent-soft: rgba(159, 197, 169, 0.12);
   --positive: #7fd4a2;
   --negative: #e59089;
+  --caution: #d2b86b;
   --ring: rgba(159, 197, 169, 0.35);
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.2), 0 10px 30px rgba(0, 0, 0, 0.18);
   --shadow-2: 0 16px 40px rgba(0, 0, 0, 0.3);
@@ -165,6 +168,9 @@ h3 {
 .flat {
   color: var(--text-faint);
 }
+.caution {
+  color: var(--caution);
+}
 
 .risk-profile {
   margin-top: 18px;
@@ -224,7 +230,7 @@ h3 {
 }
 
 .risk-low { color: var(--positive); }
-.risk-medium { color: #d2b86b; }
+.risk-medium { color: var(--caution); }
 .risk-high { color: var(--negative); }
 
 .risk-report {
@@ -287,7 +293,7 @@ h3 {
 }
 
 .finding-good span { background: var(--positive); }
-.finding-warn span { background: #d2b86b; }
+.finding-warn span { background: var(--caution); }
 .finding-bad span { background: var(--negative); }
 .finding-bad p { color: var(--text); }
 
@@ -1866,20 +1872,138 @@ main:focus {
   line-height: 1.2;
 }
 
-.insight-line {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 0;
+.behavior-line {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 13px 0;
   border-top: 1px solid var(--border);
   color: var(--text-muted);
   font-size: 12px;
 }
 
-.insight-line b {
-  color: var(--accent);
+.behavior-line b {
+  font: 13px/1 var(--font-mono);
+  letter-spacing: -0.2px;
+}
+
+.behavior-line small {
+  grid-column: 1 / -1;
+  color: var(--text-faint);
+  font: 10px var(--font-mono);
+}
+
+.meter {
+  grid-column: 1 / -1;
+  height: 3px;
+  margin-top: 2px;
+  border-radius: 99px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.meter i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--text-faint);
+  transition: width var(--speed) ease-out;
+}
+
+.meter i.positive { background: var(--positive); }
+.meter i.caution { background: var(--caution); }
+.meter i.negative { background: var(--negative); }
+
+.behavior-note {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* The draft trade, measured while it is still a draft. */
+.risk-preview {
+  margin: 18px 0 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--text-faint);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.risk-preview.good { border-left-color: var(--positive); }
+.risk-preview.warn { border-left-color: var(--caution); }
+.risk-preview.bad { border-left-color: var(--negative); }
+
+.risk-preview-cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin: 10px 0 0;
+}
+
+.risk-preview-cells dt {
+  color: var(--text-faint);
   font: 10px var(--font-mono);
   letter-spacing: 0.5px;
+}
+
+.risk-preview-cells dd {
+  margin: 4px 0 0;
+  font: 13px/1.3 var(--font-mono);
+}
+
+.risk-preview-cells dd em {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.risk-preview-note {
+  margin: 12px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.risk-preview-note.warn { color: var(--caution); }
+.risk-preview-note.bad { color: var(--negative); }
+
+.trade-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.risk-chip {
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  color: var(--text-faint);
+  font: 9px/1.5 var(--font-mono);
+  letter-spacing: 0.5px;
+}
+
+.risk-chip.good,
+.risk-chip.positive {
+  border-color: color-mix(in srgb, var(--positive) 35%, transparent);
+  color: var(--positive);
+}
+
+.risk-chip.warn {
+  border-color: color-mix(in srgb, var(--caution) 45%, transparent);
+  color: var(--caution);
+}
+
+.risk-chip.bad,
+.risk-chip.negative {
+  border-color: color-mix(in srgb, var(--negative) 35%, transparent);
+  color: var(--negative);
 }
 
 .profile-card {
