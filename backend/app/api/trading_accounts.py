@@ -32,6 +32,8 @@ from ..schemas.account import (
     TradingAccountRiskProfileCreate,
     TradingAccountRiskProfileResponse,
 )
+from ..schemas.plan import TradingPlanCreate, TradingPlanResponse
+from ..services.trading_plan import create_trading_plan, list_trading_plans
 
 
 router = APIRouter(
@@ -90,6 +92,38 @@ def get_account_risk_profile(
 ) -> TradingAccountRiskProfileResponse:
     try:
         return get_risk_profile(db, current_user, account_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post(
+    "/{account_id}/plans",
+    response_model=TradingPlanResponse,
+    status_code=201,
+)
+def create_account_plan(
+    account_id: UUID,
+    plan_data: TradingPlanCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TradingPlanResponse:
+    try:
+        return create_trading_plan(db, current_user, account_id, plan_data)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get(
+    "/{account_id}/plans",
+    response_model=list[TradingPlanResponse],
+)
+def get_account_plans(
+    account_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[TradingPlanResponse]:
+    try:
+        return list_trading_plans(db, current_user, account_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

@@ -9,6 +9,7 @@ from ..models.trading_accounts import TradingAccount
 from ..models.trade import Trade
 from ..schemas.trade import TradeCreate, TradeResponse, TradeClose
 from .risk_assessment import create_automatic_risk_assessment
+from .trading_plan import get_active_trading_plan
 
 
 class TradeValidationError(ValueError):
@@ -26,8 +27,11 @@ def create_trade(
     if account is None or account.user_id != current_user.id:
         raise ValueError("Trading account not found")
 
+    active_plan = get_active_trading_plan(db, account.id)
+
     trade = Trade(
         account_id=account.id,
+        plan_id=active_plan.id if active_plan is not None else None,
         instrument=trade_data.instrument,
         is_long=trade_data.is_long,
         is_closed=False,

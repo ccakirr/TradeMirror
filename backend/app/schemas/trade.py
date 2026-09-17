@@ -60,6 +60,7 @@ class TradeCreate(BaseModel):
 class TradeResponse(BaseModel):
     id: UUID
     account_id: UUID
+    plan_id: UUID | None
     instrument: str
     is_long: bool
     is_closed: bool

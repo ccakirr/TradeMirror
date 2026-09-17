@@ -32,10 +32,19 @@ class Trade(Base):
         index=True
     )
 
+    plan_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("trading_plans.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     trading_account = relationship(
         "TradingAccount",
         back_populates="trades"
     )
+
+    trading_plan = relationship("TradingPlan", back_populates="trades")
 
     risk_assessments = relationship(
         "RiskAssessment",

@@ -74,3 +74,10 @@ class TradingAccount(Base):
         uselist=False,
         cascade="all, delete-orphan",
     )
+
+    trading_plans = relationship(
+        "TradingPlan",
+        back_populates="account",
+        cascade="all, delete-orphan",
+        order_by="TradingPlan.version.desc()",
+    )
