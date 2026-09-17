@@ -73,6 +73,26 @@ export function Field({ label, hint, error, optional, affix, children }) {
   );
 }
 
+/** A rule that is either in force or it isn't — a switch reads that faster than a checkbox. */
+export function Toggle({ label, hint, checked, onChange }) {
+  return (
+    <label className={`toggle ${checked ? "on" : ""}`}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <span className="toggle-track" aria-hidden="true">
+        <i />
+      </span>
+      <span className="toggle-copy">
+        <b>{label}</b>
+        {hint && <small>{hint}</small>}
+      </span>
+    </label>
+  );
+}
+
 export function Badge({ tone = "neutral", children }) {
   return <span className={`badge ${tone}`}>{children}</span>;
 }

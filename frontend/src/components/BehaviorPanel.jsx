@@ -25,7 +25,8 @@ function Line({ label, value, hint, tone = "", meter }) {
  * set, how often the exit honored the plan, and what the risk actually was.
  * A metric without data stays empty — missing history is never counted as zero.
  */
-export default function BehaviorPanel({ t, lang, behavior, limitPct, hasProfile }) {
+export default function BehaviorPanel({ t, lang, behavior, limit }) {
+  const limitPct = limit.pct;
   const share = (value) => (value === null ? "—" : `${Math.round(value)}%`);
   const shareTone = (value, good, fair) =>
     value === null ? "" : value >= good ? "positive" : value >= fair ? "caution" : "negative";
@@ -100,7 +101,15 @@ export default function BehaviorPanel({ t, lang, behavior, limitPct, hasProfile 
             hint={behavior.closed ? t("closedCount", { count: behavior.closed }) : t("notEnough")}
           />
 
-          {!hasProfile && <p className="behavior-note">{t("defaultLimitNote", { limit: decimal(limitPct, lang) })}</p>}
+          {/* Every number above was measured against one limit; the panel says
+              which one, because a plan and a fallback are not the same claim. */}
+          <p className="behavior-note">
+            {limit.source === "plan"
+              ? t("planLimitNote", { version: limit.version, limit: decimal(limitPct, lang) })
+              : limit.source === "profile"
+                ? t("profileLimitNote", { limit: decimal(limitPct, lang) })
+                : t("defaultLimitNote", { limit: decimal(limitPct, lang) })}
+          </p>
         </>
       ) : (
         <p className="muted">{t("behaviorEmpty")}</p>

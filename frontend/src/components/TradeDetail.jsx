@@ -33,6 +33,7 @@ export default function TradeDetail({
   lang,
   trade,
   instrument,
+  plan = null,
   onLoad,
   onCloseTrade,
   assessments = [],
@@ -206,6 +207,15 @@ export default function TradeDetail({
 
       <section className="trade-detail-block">
         <p className="eyebrow">{t("plan")}</p>
+        {/* The account's rules as they stood when this was opened — a plan
+            published since does not get to re-judge an old trade. */}
+        {plan && (
+          <p className="trade-plan-line">
+            <b>v{plan.version}</b>
+            <span>{t("openedUnderPlan")}</span>
+            <em>{t("planRiskLine", { limit: decimal(plan.max_risk_per_trade_pct, lang) })}</em>
+          </p>
+        )}
         {hasPlan ? (
           <dl className="trade-details">
             <Row label={t("stop")} value={trade.stop_loss ? price(trade.stop_loss, lang) : null} />

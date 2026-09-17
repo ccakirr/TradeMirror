@@ -1,11 +1,12 @@
 import { useMemo, useRef, useState } from "react";
 import { summarize } from "../lib/trades";
+import { planBadge } from "../lib/plan";
 import { Button, EmptyState, Field, Skeleton } from "./ui";
 import AccountCard from "./AccountCard";
 
 const emptyForm = { name: "", initial_balance: "" };
 
-export default function Accounts({ t, lang, accounts, tradesByAccount, loading, open, onCreate }) {
+export default function Accounts({ t, lang, accounts, tradesByAccount, plansByAccount = {}, loading, open, onCreate }) {
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
   const [pending, setPending] = useState(false);
@@ -85,6 +86,11 @@ export default function Accounts({ t, lang, accounts, tradesByAccount, loading, 
                   key={account.id}
                   account={account}
                   summary={tradesByAccount[account.id] ? summarize(tradesByAccount[account.id]) : undefined}
+                  plan={planBadge(
+                    plansByAccount[account.id],
+                    tradesByAccount[account.id],
+                    account.current_balance,
+                  )}
                   t={t}
                   lang={lang}
                   onClick={() => open(account)}

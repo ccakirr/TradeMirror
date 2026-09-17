@@ -9,12 +9,14 @@ from ..models.risk_assessment import RiskAssessment
 from ..models.risk_profile import TradingAccountRiskProfile
 from ..models.trade import Trade
 from ..models.trading_accounts import TradingAccount
+from ..models.trading_plan import TradingPlan
 from ..models.user import User
 from ..schemas.risk_report import RiskReportFinding, RiskReportResponse
 
 
-# Without a saved risk profile the report still needs a yardstick; 2% per trade
-# is the common retail rule of thumb, and the client says it is the fallback.
+# Without a plan or a saved risk profile the report still needs a yardstick; 2%
+# per trade is the common retail rule of thumb, and the client says it is the
+# fallback being used.
 DEFAULT_RISK_LIMIT_PCT = Decimal("2")
 
 # A position worth more than the account means leverage. Normal on forex and
@@ -141,6 +143,7 @@ def compose_risk_report(
     trade: Trade,
     profile: TradingAccountRiskProfile | None,
     assessments: list[RiskAssessment],
+    plan: TradingPlan | None = None,
 ) -> RiskReportResponse:
     """Turn one trade into an explainable risk report.
 
@@ -165,11 +168,15 @@ def compose_risk_report(
     risk_pct = None if risk_amount is None else risk_amount / balance * 100
     reward_risk = _reward_risk(trade)
     holding_days = _holding_days(trade)
-    limit_pct = (
-        DEFAULT_RISK_LIMIT_PCT
-        if profile is None
-        else Decimal(profile.risk_per_trade_pct)
-    )
+    # The plan the trade was opened under judges it, whatever the account has
+    # committed to since. Only an account with no plan falls back to the
+    # profile, and then to the default.
+    if plan is not None:
+        limit_pct = Decimal(plan.max_risk_per_trade_pct)
+    elif profile is not None:
+        limit_pct = Decimal(profile.risk_per_trade_pct)
+    else:
+        limit_pct = DEFAULT_RISK_LIMIT_PCT
 
     r_multiple = None
     if trade.is_closed and trade.pnl is not None and risk_amount:
@@ -185,7 +192,7 @@ def compose_risk_report(
         rounded_limit = _round(limit_pct, "0.01")
 
         # A limit of zero is a real answer, not a missing one: every cent of
-        # risk is then above what the profile allows.
+        # risk is then above what the plan allows.
         if risk_pct > limit_pct * 2:
             add("risk_far_above_limit", "bad", pct=rounded_pct, limit=rounded_limit)
         elif risk_pct > limit_pct:
@@ -269,7 +276,14 @@ def compose_risk_report(
     # 6 — the model, last: it comments on the account's habits, not this fill.
     assessment = _pick_assessment(assessments)
 
-    if profile is None:
+    if plan is not None:
+        add(
+            "plan_version",
+            "info",
+            version=Decimal(plan.version),
+            limit=_round(limit_pct, "0.01"),
+        )
+    elif profile is None:
         add("profile_missing", "info", limit=_round(limit_pct, "0.01"))
 
     if assessment is None:
@@ -346,4 +360,4 @@ def get_risk_report(
         ).all()
     )
 
-    return compose_risk_report(account, trade, profile, assessments)
+    return compose_risk_report(account, trade, profile, assessments, trade.trading_plan)

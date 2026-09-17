@@ -10,6 +10,10 @@ import Accounts from "./components/Accounts";
 import AccountDetail from "./components/AccountDetail";
 import Profile from "./components/Profile";
 
+// A stable empty list: a fresh [] each render would invalidate the memos that
+// derive the active plan and its limit.
+const NO_PLANS = [];
+
 const VIEWS = {
   dashboard: { icon: "◈", key: "overview" },
   accounts: { icon: "▣", key: "accounts" },
@@ -27,6 +31,7 @@ export default function App() {
   const [accounts, setAccounts] = useState([]);
   const [tradesByAccount, setTradesByAccount] = useState({});
   const [riskProfiles, setRiskProfiles] = useState({});
+  const [plansByAccount, setPlansByAccount] = useState({});
   const [riskAssessmentsByTrade, setRiskAssessmentsByTrade] = useState({});
   const [riskReportsByTrade, setRiskReportsByTrade] = useState({});
   const [instruments, setInstruments] = useState([]);
@@ -60,6 +65,7 @@ export default function App() {
     setAccounts([]);
     setTradesByAccount({});
     setRiskProfiles({});
+    setPlansByAccount({});
     setRiskAssessmentsByTrade({});
     setRiskReportsByTrade({});
     setSelectedId(null);
@@ -96,15 +102,27 @@ export default function App() {
         if (cancelled) return;
         setAccounts(list);
 
-        const profiles = await Promise.all(
-          list.map((account) =>
-            api(`/api/v1/accounts/${account.id}/risk-profile`, {}, token)
-              .then((profile) => [account.id, profile])
-              .catch(() => [account.id, null]),
+        // The plan sets the limit every risk panel measures against, so it is
+        // fetched with the profile rather than waiting on the journals.
+        const [profiles, plans] = await Promise.all([
+          Promise.all(
+            list.map((account) =>
+              api(`/api/v1/accounts/${account.id}/risk-profile`, {}, token)
+                .then((profile) => [account.id, profile])
+                .catch(() => [account.id, null]),
+            ),
           ),
-        );
+          Promise.all(
+            list.map((account) =>
+              api(`/api/v1/accounts/${account.id}/plans`, {}, token)
+                .then((items) => [account.id, items])
+                .catch(() => [account.id, []]),
+            ),
+          ),
+        ]);
         if (cancelled) return;
         setRiskProfiles(Object.fromEntries(profiles));
+        setPlansByAccount(Object.fromEntries(plans));
 
         const journals = await Promise.all(
           list.map((account) =>
@@ -166,6 +184,7 @@ export default function App() {
       const created = await api("/api/v1/accounts/", { method: "POST", body: JSON.stringify(payload) }, token);
       setAccounts((current) => [created, ...current]);
       setTradesByAccount((current) => ({ ...current, [created.id]: [] }));
+      setPlansByAccount((current) => ({ ...current, [created.id]: [] }));
       toast(t("created"));
       return created;
     } catch (error) {
@@ -237,6 +256,27 @@ export default function App() {
       setRiskProfiles((current) => ({ ...current, [accountId]: profile }));
       toast(t("riskProfileSaved"));
       return profile;
+    } catch (error) {
+      throw friendlyError(error);
+    }
+  };
+
+  // Publishing a version closes the one before it server-side, so the list is
+  // refetched: the archived row's end date is part of the answer.
+  const createPlan = async (accountId, payload) => {
+    try {
+      const created = await api(
+        `/api/v1/accounts/${accountId}/plans`,
+        { method: "POST", body: JSON.stringify(payload) },
+        token,
+      );
+      const plans = await api(`/api/v1/accounts/${accountId}/plans`, {}, token).catch(() => null);
+      setPlansByAccount((current) => ({
+        ...current,
+        [accountId]: plans || [created, ...(current[accountId] || [])],
+      }));
+      toast(t("planSaved", { version: created.version }));
+      return created;
     } catch (error) {
       throw friendlyError(error);
     }
@@ -403,6 +443,7 @@ export default function App() {
               user={user}
               accounts={accounts}
               tradesByAccount={tradesByAccount}
+              plansByAccount={plansByAccount}
               loading={loadingData}
               go={go}
               open={openAccount}
@@ -414,6 +455,7 @@ export default function App() {
               lang={lang}
               accounts={accounts}
               tradesByAccount={tradesByAccount}
+              plansByAccount={plansByAccount}
               loading={loadingData}
               open={openAccount}
               onCreate={createAccount}
@@ -426,6 +468,8 @@ export default function App() {
               account={selected}
               trades={tradesByAccount[selected.id]}
               riskProfile={riskProfiles[selected.id]}
+              plans={plansByAccount[selected.id] || NO_PLANS}
+              onCreatePlan={createPlan}
               riskAssessmentsByTrade={riskAssessmentsByTrade}
               riskReportsByTrade={riskReportsByTrade}
               loading={loadingData && !tradesByAccount[selected.id]}

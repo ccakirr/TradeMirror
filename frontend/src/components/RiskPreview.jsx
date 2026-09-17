@@ -1,13 +1,15 @@
 import { decimal, money } from "../lib/format";
+import { planCheck } from "../lib/plan";
 
 /**
  * The mirror, held up before the decision instead of after it: what the trade
- * being typed would actually risk, next to the limit the plan set.
+ * being typed would actually risk, next to the limits the plan set — including
+ * the ones the day has already spent.
  *
  * It never blocks the submit — a journal records what happened, including the
  * trades that broke the plan.
  */
-export default function RiskPreview({ t, lang, draft, balance, limitPct }) {
+export default function RiskPreview({ t, lang, draft, balance, limitPct, plan = null, trades = [] }) {
   const entry = Number(draft.entry_price);
   const size = Number(draft.position_size);
   const stop = Number(draft.stop_loss);
@@ -24,12 +26,39 @@ export default function RiskPreview({ t, lang, draft, balance, limitPct }) {
 
   const limit = Number(limitPct) || 0;
   const overBy = riskPct !== null && limit > 0 ? riskPct / limit : null;
-  const tone = risk === null ? "warn" : overBy === null ? "" : overBy > 2 ? "bad" : overBy > 1 ? "warn" : "good";
+
+  const issues = planCheck(plan, draft, { trades, balance: account, riskPct });
+  const worst = issues.some((issue) => issue.level === "bad")
+    ? "bad"
+    : issues.length
+      ? "warn"
+      : null;
+
+  const tone =
+    worst ||
+    (risk === null ? "warn" : overBy === null ? "" : overBy > 2 ? "bad" : overBy > 1 ? "warn" : "good");
+
+  // Numbers reach the copy already written in the reader's locale.
+  const say = (issue) =>
+    t(
+      issue.code,
+      Object.fromEntries(
+        Object.entries(issue.values || {}).map(([key, value]) => [
+          key,
+          typeof value === "number" && key !== "count" ? decimal(value, lang) : value,
+        ]),
+      ),
+    );
 
   const notes = [];
+  const flagged = issues.some((issue) => issue.code.startsWith("ruleRisk"));
+
   if (risk === null) {
-    notes.push({ tone: "warn", text: t("previewNoStop") });
-  } else if (riskPct !== null) {
+    // A plan that requires a stop says it more sharply, just below.
+    if (!plan?.require_stop_loss) notes.push({ tone: "warn", text: t("previewNoStop") });
+  } else if (riskPct !== null && !flagged) {
+    // With a plan the breach is reported as a broken rule below; without one the
+    // limit is still worth measuring against.
     const values = { pct: decimal(riskPct, lang), limit: decimal(limit, lang) };
     notes.push(
       overBy > 1
@@ -37,11 +66,16 @@ export default function RiskPreview({ t, lang, draft, balance, limitPct }) {
         : { tone: "good", text: t("previewWithinLimit", values) },
     );
   }
+
+  for (const issue of issues) notes.push({ tone: issue.level, text: say(issue) });
   if (reward !== null && reward < 1) notes.push({ tone: "warn", text: t("previewThinReward") });
 
   return (
     <div className={`risk-preview ${tone}`} role="status" aria-live="polite">
-      <p className="eyebrow">{t("thisTrade")}</p>
+      <p className="eyebrow">
+        {t("thisTrade")}
+        {plan && <span className="preview-plan">{t("againstPlan", { version: plan.version })}</span>}
+      </p>
 
       <dl className="risk-preview-cells">
         <div>

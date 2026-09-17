@@ -3,7 +3,7 @@ import { rMultiple, tradeReturnPercent } from "../lib/trades";
 import { Badge } from "./ui";
 
 /** A journal line: summary only. Everything else lives in the detail panel. */
-export default function TradeRow({ trade, t, lang, riskPct = null, limitPct, selected, onSelect }) {
+export default function TradeRow({ trade, t, lang, riskPct = null, limitPct, planVersion = null, selected, onSelect }) {
   const returned = tradeReturnPercent(trade);
   const r = rMultiple(trade);
 
@@ -45,6 +45,13 @@ export default function TradeRow({ trade, t, lang, riskPct = null, limitPct, sel
               <b className={`risk-chip ${sign(r)}`} title={t("rMultiple")}>
                 {r > 0 ? "+" : ""}
                 {decimal(r, lang)}R
+              </b>
+            )}
+            {/* Which version of the plan this trade was opened under — an old
+                trade is judged by the rules that were in force back then. */}
+            {planVersion !== null && (
+              <b className="risk-chip plan" title={t("planInForce")}>
+                v{planVersion}
               </b>
             )}
           </span>

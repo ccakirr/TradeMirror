@@ -12,7 +12,7 @@ const EMPTY = {
   position_sizing_discipline: "8",
 };
 
-export default function RiskProfile({ t, profile, onSave, assessments = [] }) {
+export default function RiskProfile({ t, profile, onSave, assessments = [], planActive = false }) {
   const [form, setForm] = useState(EMPTY);
   const [open, setOpen] = useState(!profile);
   const [pending, setPending] = useState(false);
@@ -94,6 +94,7 @@ export default function RiskProfile({ t, profile, onSave, assessments = [] }) {
           <span>{t("riskPerTrade")}: <b>{profile?.risk_per_trade_pct ?? "—"}%</b></span>
           <span>{t("tradesPerMonth")}: <b>{profile?.trades_per_month ?? "—"}</b></span>
           <span>{t("assessments")}: <b>{assessments.length}</b></span>
+          {planActive && <p className="behavior-note">{t("profileVsPlan")}</p>}
         </div>
       )}
     </section>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { changePercent, decimal, fullDate, money, percent, sign, signedMoney } from "../lib/format";
 import { behaviorSummary, riskLedger, riskPercent, summarize } from "../lib/trades";
 import { CATEGORY_KEYS, quantize, stepDecimals } from "../lib/instruments";
+import { activePlan, riskLimit } from "../lib/plan";
 import { Button, EmptyState, Field, Segmented, Skeleton } from "./ui";
 import Combobox from "./Combobox";
 import { Stat, StatGrid } from "./Stats";
@@ -10,8 +11,8 @@ import TradeDetail from "./TradeDetail";
 import RiskProfile from "./RiskProfile";
 import RiskPreview from "./RiskPreview";
 import BehaviorPanel from "./BehaviorPanel";
-
-const DEFAULT_RISK_LIMIT_PCT = 2;
+import PlanStatus from "./PlanStatus";
+import TradingPlan from "./TradingPlan";
 
 const emptyTrade = {
   instrument: "",
@@ -36,6 +37,8 @@ export default function AccountDetail({
   onLoadTrade,
   riskProfile,
   onSaveRiskProfile,
+  plans = [],
+  onCreatePlan,
   riskAssessmentsByTrade = {},
   onLoadRiskAssessments,
   riskReportsByTrade = {},
@@ -47,15 +50,24 @@ export default function AccountDetail({
   const [filter, setFilter] = useState("all");
   const [formOpen, setFormOpen] = useState(false);
   const [selectedTradeId, setSelectedTradeId] = useState(null);
+  const [planOpen, setPlanOpen] = useState(false);
+  // The plan can name the setups this account trades; the journal keeps the
+  // answer in the note, which is the only place a trade records its reasoning.
+  const [setup, setSetup] = useState("");
   const instrumentRef = useRef(null);
 
   const list = trades || [];
   const summary = useMemo(() => summarize(list), [list]);
   const delta = changePercent(account.initial_balance, account.current_balance);
 
-  // Without a saved profile the page still needs a yardstick; the panels say
-  // when the 2% fallback is the one being used.
-  const limitPct = Number(riskProfile?.risk_per_trade_pct) || DEFAULT_RISK_LIMIT_PCT;
+  // The plan in force sets the limit; an account that has not written one yet
+  // falls back to the risk profile, then to the panels' stated default.
+  const plan = useMemo(() => activePlan(plans), [plans]);
+  const limit = useMemo(() => riskLimit(plan, riskProfile), [plan, riskProfile]);
+  const limitPct = limit.pct;
+
+  // A trade is judged by the version it was opened under, not by today's rules.
+  const planById = useMemo(() => new Map(plans.map((item) => [item.id, item])), [plans]);
 
   const behavior = useMemo(
     () => behaviorSummary(list, { balance: account.current_balance, limitPct }),
@@ -122,9 +134,12 @@ export default function AccountDetail({
     [instruments, selectedTrade],
   );
 
-  // Switching accounts must not leave another journal's trade open.
+  // Switching accounts must not leave another journal's trade open, or another
+  // account's plan half-written.
   useEffect(() => {
     setSelectedTradeId(null);
+    setPlanOpen(false);
+    setSetup("");
   }, [account.id]);
 
   const visible = useMemo(() => {
@@ -161,9 +176,14 @@ export default function AccountDetail({
         position_size: quantize(form.position_size, sizeStep),
         stop_loss: optional(form.stop_loss, priceStep),
         take_profit: optional(form.take_profit, priceStep),
-        notes: form.notes.trim() || null,
+        // A setup the current plan no longer lists is not tagged onto the note.
+        notes:
+          [plan?.allowed_setups?.includes(setup) ? `[${setup}]` : "", form.notes.trim()]
+            .filter(Boolean)
+            .join(" ") || null,
       });
       setForm(emptyTrade);
+      setSetup("");
       instrumentRef.current?.focus();
     } catch (error) {
       setErrors({ form: error.message });
@@ -216,6 +236,18 @@ export default function AccountDetail({
         />
       </StatGrid>
 
+      <PlanStatus
+        t={t}
+        lang={lang}
+        plan={plan}
+        trades={list}
+        balance={account.current_balance}
+        onWritePlan={() => {
+          setPlanOpen(true);
+          document.getElementById("trading-plan")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }}
+      />
+
       <div className="detail-grid">
         <section className="card journal-card">
           <div className="card-title">
@@ -265,6 +297,7 @@ export default function AccountDetail({
                   lang={lang}
                   riskPct={riskPercent(trade, ledger.get(trade.id))}
                   limitPct={limitPct}
+                  planVersion={planById.get(trade.plan_id)?.version ?? null}
                   selected={trade.id === selectedTradeId}
                   onSelect={(picked) =>
                     setSelectedTradeId((current) => (current === picked.id ? null : picked.id))
@@ -367,7 +400,28 @@ export default function AccountDetail({
                 draft={form}
                 balance={account.current_balance}
                 limitPct={limitPct}
+                plan={plan}
+                trades={list}
               />
+
+              {plan?.allowed_setups?.length > 0 && (
+                <div className="setup-picker">
+                  <span className="field-hint">{t("setupPrompt")}</span>
+                  <div className="setup-chips">
+                    {plan.allowed_setups.map((name) => (
+                      <button
+                        type="button"
+                        key={name}
+                        className={name === setup ? "on" : ""}
+                        aria-pressed={name === setup}
+                        onClick={() => setSetup((current) => (current === name ? "" : name))}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <Field label={t("notes")} optional={t("optional")}>
                 <textarea value={form.notes} onChange={update("notes")} rows="3" placeholder={t("notesPlaceholder")} />
@@ -392,6 +446,7 @@ export default function AccountDetail({
             lang={lang}
             trade={selectedTrade}
             instrument={selectedInstrument}
+            plan={planById.get(selectedTrade.plan_id) || null}
             onLoad={onLoadTrade}
             onCloseTrade={onCloseTrade}
             assessments={selectedAssessments}
@@ -401,19 +456,24 @@ export default function AccountDetail({
             onDismiss={() => setSelectedTradeId(null)}
           />
         ) : (
-          <BehaviorPanel
-            t={t}
-            lang={lang}
-            behavior={behavior}
-            limitPct={limitPct}
-            hasProfile={Boolean(riskProfile)}
-          />
+          <BehaviorPanel t={t} lang={lang} behavior={behavior} limit={limit} />
         )}
       </div>
+
+      <TradingPlan
+        t={t}
+        lang={lang}
+        plans={plans}
+        instruments={instruments}
+        open={planOpen}
+        setOpen={setPlanOpen}
+        onCreate={(payload) => onCreatePlan(account.id, payload)}
+      />
 
       <RiskProfile
         t={t}
         profile={riskProfile}
+        planActive={Boolean(plan)}
         assessments={selectedAssessments}
         onSave={(payload) => onSaveRiskProfile(account.id, payload)}
       />

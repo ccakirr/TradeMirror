@@ -1,11 +1,12 @@
 import { useMemo } from "react";
 import { dateTime, money, price, sign, signedMoney } from "../lib/format";
 import { summarize } from "../lib/trades";
+import { planBadge } from "../lib/plan";
 import { Badge, Button, EmptyState, Skeleton } from "./ui";
 import { Stat, StatGrid } from "./Stats";
 import AccountCard from "./AccountCard";
 
-export default function Dashboard({ t, lang, user, accounts, tradesByAccount, loading, go, open }) {
+export default function Dashboard({ t, lang, user, accounts, tradesByAccount, plansByAccount = {}, loading, go, open }) {
   const allTrades = useMemo(
     () =>
       accounts.flatMap((account) =>
@@ -89,6 +90,11 @@ export default function Dashboard({ t, lang, user, accounts, tradesByAccount, lo
               key={account.id}
               account={account}
               summary={tradesByAccount[account.id] ? summarize(tradesByAccount[account.id]) : undefined}
+              plan={planBadge(
+                plansByAccount[account.id],
+                tradesByAccount[account.id],
+                account.current_balance,
+              )}
               t={t}
               lang={lang}
               onClick={() => open(account)}

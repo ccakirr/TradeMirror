@@ -73,6 +73,22 @@ def make_assessment(risk_class="low", score="0.12", stage="entry"):
     )
 
 
+def make_plan(**overrides):
+    plan = {
+        "id": uuid.uuid4(),
+        "version": 3,
+        "max_risk_per_trade_pct": Decimal("1"),
+        "max_daily_loss_pct": Decimal("3"),
+        "max_trades_per_day": 5,
+        "max_open_positions": 3,
+        "require_stop_loss": True,
+        "allowed_instruments": ["BTCUSDT"],
+        "allowed_setups": [],
+    }
+    plan.update(overrides)
+    return SimpleNamespace(**plan)
+
+
 def codes(report):
     return [finding.code for finding in report.findings]
 
@@ -255,6 +271,45 @@ def test_without_a_profile_the_default_limit_is_used():
     assert report.score is None
     assert "profile_missing" in codes(report)
     assert "model_missing" in codes(report)
+
+
+def test_the_plan_sets_the_limit_over_the_profile():
+    # The profile allows 2%, the plan the trade was opened under allows 1%.
+    report = compose_risk_report(
+        make_account(),
+        make_trade(),
+        make_profile(),
+        [make_assessment()],
+        make_plan(),
+    )
+
+    assert report.risk_limit_pct == Decimal("1.00")
+    assert report.risk_pct == Decimal("1.00")
+    assert "risk_within_limit" in codes(report)
+    assert "profile_missing" not in codes(report)
+
+    # Findings ship plain numbers; the client formats them for its locale.
+    version = next(f for f in report.findings if f.code == "plan_version")
+    assert version.values == {"version": "3", "limit": "1"}
+
+
+def test_a_tighter_plan_turns_an_accepted_risk_into_a_breach():
+    report = compose_risk_report(
+        make_account(),
+        make_trade(),
+        make_profile(),
+        [make_assessment()],
+        make_plan(max_risk_per_trade_pct=Decimal("0.4")),
+    )
+
+    assert level_of(report, "risk_far_above_limit") == "bad"
+
+
+def test_without_a_plan_the_profile_still_sets_the_limit():
+    report = compose_risk_report(make_account(), make_trade(), make_profile(), [], None)
+
+    assert report.risk_limit_pct == Decimal("2.00")
+    assert "plan_version" not in codes(report)
 
 
 def test_high_model_class_carries_the_report():

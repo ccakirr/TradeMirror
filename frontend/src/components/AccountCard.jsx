@@ -1,7 +1,7 @@
 import { changePercent, money, percent, sign } from "../lib/format";
 import { Skeleton } from "./ui";
 
-export default function AccountCard({ account, summary, t, lang, onClick }) {
+export default function AccountCard({ account, summary, plan = null, t, lang, onClick }) {
   const delta = changePercent(account.initial_balance, account.current_balance);
   const tradeLabel =
     summary === undefined
@@ -39,6 +39,10 @@ export default function AccountCard({ account, summary, t, lang, onClick }) {
           <span>
             {tradeLabel}
             {summary.open > 0 && <em className="open-pill">{summary.open} {t("openLabel")}</em>}
+            {/* An account without rules is the one worth spotting from here. */}
+            <em className={`plan-pill ${plan ? plan.state : "none"}`}>
+              {plan ? `v${plan.version}` : t("noPlanShort")}
+            </em>
           </span>
         )}
         <b>{t("open")} →</b>
