@@ -46,6 +46,13 @@ class Trade(Base):
 
     trading_plan = relationship("TradingPlan", back_populates="trades")
 
+    review = relationship(
+        "TradeReview",
+        back_populates="trade",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
     risk_assessments = relationship(
         "RiskAssessment",
         back_populates="trade",

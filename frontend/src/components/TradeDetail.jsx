@@ -12,6 +12,7 @@ import {
 import { quantize, stepDecimals } from "../lib/instruments";
 import { findingText, VERDICT_KEYS as RISK_VERDICT_KEYS } from "../lib/riskReport";
 import { Badge, Button, Spinner } from "./ui";
+import TradeReview from "./TradeReview";
 
 const VERDICT_KEYS = { target: "exitTarget", stop: "exitStop", manual: "exitManual" };
 
@@ -41,6 +42,9 @@ export default function TradeDetail({
   report = null,
   onLoadReport,
   onDismiss,
+  review,
+  onLoadReview,
+  onSaveReview,
 }) {
   const [refreshing, setRefreshing] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -54,11 +58,13 @@ export default function TradeDetail({
   const loadRef = useRef(onLoad);
   const loadAssessmentsRef = useRef(onLoadAssessments);
   const loadReportRef = useRef(onLoadReport);
+  const loadReviewRef = useRef(onLoadReview);
 
   useEffect(() => {
     loadRef.current = onLoad;
     loadAssessmentsRef.current = onLoadAssessments;
     loadReportRef.current = onLoadReport;
+    loadReviewRef.current = onLoadReview;
   });
 
   // The list already holds a copy, so the panel paints instantly and then
@@ -99,6 +105,10 @@ export default function TradeDetail({
     return () => {
       cancelled = true;
     };
+  }, [trade.id, trade.is_closed]);
+
+  useEffect(() => {
+    if (trade.is_closed) loadReviewRef.current?.(trade.id).catch(() => {});
   }, [trade.id, trade.is_closed]);
 
   // A different trade is a different panel: never carry a half-typed exit over.
@@ -227,6 +237,14 @@ export default function TradeDetail({
           <p className="panel-note">{t("noPlanRecorded")}</p>
         )}
       </section>
+
+      {closed && (
+        <TradeReview
+          t={t}
+          review={review}
+          onSave={(payload) => onSaveReview(trade.id, payload)}
+        />
+      )}
 
       <section className="trade-detail-block">
         <p className="eyebrow">{t("execution")}</p>

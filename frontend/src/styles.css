@@ -210,6 +210,55 @@ h3 {
   gap: 8px;
 }
 
+.trade-review-block {
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.review-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.review-head h3 {
+  font-size: 17px;
+  letter-spacing: -0.4px;
+}
+
+.review-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.trade-review-form {
+  display: grid;
+  gap: 13px;
+}
+
+.review-summary {
+  display: grid;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.review-summary b {
+  color: var(--text);
+}
+
+.review-summary p {
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border-left: 2px solid var(--accent);
+  color: var(--text);
+  line-height: 1.55;
+}
+
 .risk-assessment {
   display: grid;
   grid-template-columns: 1fr auto auto;
@@ -313,6 +362,7 @@ h3 {
 
 @media (max-width: 760px) {
   .risk-profile-fields { grid-template-columns: 1fr; }
+  .review-fields { grid-template-columns: 1fr; }
 }
 
 .brand,

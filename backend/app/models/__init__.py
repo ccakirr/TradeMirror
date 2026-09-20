@@ -4,3 +4,4 @@ from .trade import Trade
 from .risk_assessment import RiskAssessment
 from .risk_profile import TradingAccountRiskProfile
 from .trading_plan import TradingPlan
+from .trade_review import TradeReview

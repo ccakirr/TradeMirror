@@ -34,6 +34,7 @@ export default function App() {
   const [plansByAccount, setPlansByAccount] = useState({});
   const [riskAssessmentsByTrade, setRiskAssessmentsByTrade] = useState({});
   const [riskReportsByTrade, setRiskReportsByTrade] = useState({});
+  const [reviewsByTrade, setReviewsByTrade] = useState({});
   const [instruments, setInstruments] = useState([]);
   const [booting, setBooting] = useState(Boolean(readToken()));
   const [loadingData, setLoadingData] = useState(false);
@@ -68,6 +69,7 @@ export default function App() {
     setPlansByAccount({});
     setRiskAssessmentsByTrade({});
     setRiskReportsByTrade({});
+    setReviewsByTrade({});
     setSelectedId(null);
     setView("dashboard");
   }, []);
@@ -304,6 +306,23 @@ export default function App() {
     return report;
   };
 
+  const loadReview = async (accountId, tradeId) => {
+    const review = await api(`/api/v1/accounts/${accountId}/trades/${tradeId}/review`, {}, token);
+    setReviewsByTrade((current) => ({ ...current, [tradeId]: review }));
+    return review;
+  };
+
+  const saveReview = async (accountId, tradeId, payload) => {
+    const review = await api(
+      `/api/v1/accounts/${accountId}/trades/${tradeId}/review`,
+      { method: "PUT", body: JSON.stringify(payload) },
+      token,
+    );
+    setReviewsByTrade((current) => ({ ...current, [tradeId]: review }));
+    toast(t("reviewSaved"));
+    return review;
+  };
+
   // The panel renders from the cached row first, then swaps in the server's copy.
   const loadTrade = async (tradeId) => {
     try {
@@ -472,6 +491,7 @@ export default function App() {
               onCreatePlan={createPlan}
               riskAssessmentsByTrade={riskAssessmentsByTrade}
               riskReportsByTrade={riskReportsByTrade}
+              reviewsByTrade={reviewsByTrade}
               loading={loadingData && !tradesByAccount[selected.id]}
               back={() => go("accounts")}
               instruments={instruments}
@@ -481,6 +501,8 @@ export default function App() {
               onSaveRiskProfile={saveRiskProfile}
               onLoadRiskAssessments={(tradeId) => loadRiskAssessments(selected.id, tradeId)}
               onLoadRiskReport={(tradeId) => loadRiskReport(selected.id, tradeId)}
+              onLoadReview={(tradeId) => loadReview(selected.id, tradeId)}
+              onSaveReview={(tradeId, payload) => saveReview(selected.id, tradeId, payload)}
             />
           )}
           {view === "profile" && (

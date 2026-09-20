@@ -43,6 +43,9 @@ export default function AccountDetail({
   onLoadRiskAssessments,
   riskReportsByTrade = {},
   onLoadRiskReport,
+  reviewsByTrade = {},
+  onLoadReview,
+  onSaveReview,
 }) {
   const [form, setForm] = useState(emptyTrade);
   const [errors, setErrors] = useState({});
@@ -453,6 +456,9 @@ export default function AccountDetail({
             onLoadAssessments={onLoadRiskAssessments}
             report={selectedReport}
             onLoadReport={onLoadRiskReport}
+            review={reviewsByTrade[selectedTrade.id]}
+            onLoadReview={onLoadReview}
+            onSaveReview={onSaveReview}
             onDismiss={() => setSelectedTradeId(null)}
           />
         ) : (

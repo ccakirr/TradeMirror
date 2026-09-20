@@ -34,6 +34,8 @@ from ..schemas.account import (
 )
 from ..schemas.plan import TradingPlanCreate, TradingPlanResponse
 from ..services.trading_plan import create_trading_plan, list_trading_plans
+from ..schemas.review import TradeReviewCreate, TradeReviewResponse
+from ..services.trade_review import save_trade_review, get_trade_review
 
 
 router = APIRouter(
@@ -124,6 +126,40 @@ def get_account_plans(
 ) -> list[TradingPlanResponse]:
     try:
         return list_trading_plans(db, current_user, account_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.put(
+    "/{account_id}/trades/{trade_id}/review",
+    response_model=TradeReviewResponse,
+)
+def save_account_trade_review(
+    account_id: UUID,
+    trade_id: UUID,
+    review_data: TradeReviewCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TradeReviewResponse:
+    try:
+        return save_trade_review(db, current_user, account_id, trade_id, review_data)
+    except ValueError as e:
+        status = 409 if "closed" in str(e) else 404
+        raise HTTPException(status_code=status, detail=str(e))
+
+
+@router.get(
+    "/{account_id}/trades/{trade_id}/review",
+    response_model=TradeReviewResponse | None,
+)
+def get_account_trade_review(
+    account_id: UUID,
+    trade_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TradeReviewResponse | None:
+    try:
+        return get_trade_review(db, current_user, account_id, trade_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
